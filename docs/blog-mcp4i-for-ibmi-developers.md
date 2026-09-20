@@ -1,72 +1,329 @@
-# MCP4i: Bringing IBM i into AI Conversations, Starting with RPGLE
+# MCP4i: Learning MCP by Building a Server in RPGLE
 
-*An open-source learning project for IBM i developers, with a path for application teams and IBM i vendors to explore.*
+An IBM i developer may know how to inspect a library, program, file, or job, but a chat model cannot see the current state of that partition on its own.
 
-Imagine joining an IBM i support call and hearing: “Which system am I connected to? What does this program reference? Which job is active?” A language model can explain what `DSPPGMREF` means, but it cannot know the current state of *your* partition. Someone must give it a controlled way to ask the system.
+<details>
+<summary>Hinglish</summary>
 
-That is the problem behind [MCP4i](https://github.com/iNewTech/MCP4i). I am building the project in public as I learn the Model Context Protocol (MCP): first the concepts and small document demos, then a read-only IBM i server written in RPGLE. The goal is an assistant that can answer questions using observed IBM i information while preserving the boundaries IBM i teams already care about: authority, qualified names, job context, and operational scope.
+IBM i developer library, program, file ya job inspect kar sakta hai, lekin chat model khud se us partition ki current state nahi dekh sakta.
 
-## What MCP adds to an IBM i integration
+</details>
 
-MCP gives an AI application a standard way to discover a server's tools and call them. The server publishes a tool name, description, and input schema; the client presents that capability to the model and carries the model's requested call to the server. The server still decides what the tool is allowed to do. The [MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) defines this discovery and call flow.
+I started [MCP4i](https://github.com/iNewTech/MCP4i) to learn the Model Context Protocol (MCP) while building a controlled way for an AI client to ask IBM i for read-only information.
 
-For IBM i, that distinction matters. A model does not receive an unrestricted 5250 session. It might see a focused tool named `get_system_info`, with no arguments, and receive a bounded result from a fixed IBM i service. Later, a separate `get_program_references` tool could take an explicitly qualified program name. The server's code and IBM i authority—not the model's wording—would determine which information can be read.
+<details>
+<summary>Hinglish</summary>
 
-## What is in the repository today?
+Maine [MCP4i](https://github.com/iNewTech/MCP4i) MCP seekhte hue banaya, taaki AI client IBM i se controlled tareeke se sirf read-only information pooch sake.
 
-MCP4i has three connected tracks:
+</details>
 
-| Track | What you can use now |
-| --- | --- |
-| Learn MCP | [Ten chapter-by-chapter lessons](https://github.com/iNewTech/MCP4i/tree/main/docs), from why MCP exists through tool design, IBM i access, SQL boundaries, and operations. The [learning index](https://github.com/iNewTech/MCP4i/blob/main/docs/README.md) gives the order. |
-| Experiment locally | [Python starter](https://github.com/iNewTech/MCP4i/tree/main/cli_project), [completed Python document demo](https://github.com/iNewTech/MCP4i/tree/main/cli_project_COMPLETE), and [TypeScript starter](https://github.com/iNewTech/MCP4i/tree/main/cli_project_ts). The Python demos use local Ollama, so the exercises do not require buying an API key. These document tools teach MCP mechanics; they do **not** connect to IBM i. |
-| Build on IBM i | A [single ILE RPG program](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle) that handles MCP requests through IBM HTTP Server for i and defines one read-only `get_system_info` tool. Its [deployment guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md), [HTTP configuration example](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example), and [live smoke test](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/smoke_test.py) are in the same folder. |
+This article concentrates on the single-program RPGLE server; the other folders provide interactive MCP practice with local Ollama and fictional documents.
 
-The RPGLE source is a **prototype awaiting compilation and a live test on an IBM i development partition**. It is not a claim that every listed tool already works, or that this is ready for production deployment.
+<details>
+<summary>Hinglish</summary>
 
-## Yes, the MCP server itself is in RPGLE
+Yeh article single-program RPGLE server par focus karta hai; baaki folders local Ollama aur fictional documents ke saath interactive MCP practice ke liye hain.
 
-The first RPGLE slice does more than return a value to a Python server. IBM HTTP Server for i receives a request at `/mcp` and invokes `MCPHTTP` as a CGI program. The RPG program reads the request body, handles MCP's JSON-RPC methods, advertises `get_system_info`, runs one fixed Db2 for i query against `SYSIBMADM.ENV_SYS_INFO`, and writes the MCP response. IBM documents both [ILE RPG CGI support](https://www.ibm.com/support/pages/ile-rpg-cgi-programming-example) and the [CGI APIs](https://www.ibm.com/docs/en/i/7.6.0?topic=api-cgi-apis) used for this pattern.
+</details>
+
+## Why use RPGLE for the MCP server?
+
+MCP lets a server advertise tools with names, descriptions, and input schemas, then lets a client list and call those tools through a defined protocol ([MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)).
+
+<details>
+<summary>Hinglish</summary>
+
+MCP server ko tool ka naam, description aur input schema batane deta hai; phir client defined protocol se un tools ko list aur call kar sakta hai.
+
+</details>
+
+The IBM i community should be able to study that server-side protocol handling in a familiar language, so the first [MCPHTTP.sqlrpgle program](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle) handles the MCP request itself instead of sitting behind a Python wrapper.
+
+<details>
+<summary>Hinglish</summary>
+
+IBM i community ko server-side protocol handling apni familiar language mein samajhni chahiye, isliye pehla `MCPHTTP.sqlrpgle` program Python wrapper ke peeche rehne ke bajay MCP request khud handle karta hai.
+
+</details>
+
+IBM HTTP Server for i receives `POST /mcp` and invokes the ILE RPG program as CGI, a pattern IBM documents for RPG programs ([IBM RPG CGI example](https://www.ibm.com/support/pages/ile-rpg-cgi-programming-example)).
+
+<details>
+<summary>Hinglish</summary>
+
+IBM HTTP Server for i `POST /mcp` request receive karke ILE RPG program ko CGI ke roop mein chalata hai; IBM ne RPG ke liye is pattern ko document kiya hai.
+
+</details>
+
+The program uses IBM CGI APIs to read the request and write the response, while Db2 for i functions parse and generate JSON ([annotated source](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L16)).
+
+<details>
+<summary>Hinglish</summary>
+
+Program IBM CGI APIs se request padhta aur response likhta hai, aur Db2 for i functions se JSON parse aur generate karta hai.
+
+</details>
 
 ```text
-Chat app or MCP Inspector
-        │ tools/list, then tools/call
+MCP client or Inspector
+        │ POST /mcp: initialize, tools/list, tools/call
         ▼
-IBM HTTP Server for i
-        │ CGI request
+IBM HTTP Server for i (dedicated instance and subsystem)
+        │ CGI request body and environment
         ▼
-MCPHTTP *PGM (RPGLE)
-        │ fixed, read-only SQL
+MCP4I/MCPHTTP *PGM (ILE RPG)
+        │ fixed SELECT
         ▼
 SYSIBMADM.ENV_SYS_INFO
+        │ JSON-RPC tool result
+        ▼
+MCP client → model and user
 ```
 
-There is no always-running RPG `SBMJOB` listener in this design. The HTTP instance owns the listener and invokes the program for each request. The sample also creates a dedicated job queue and subsystem for that HTTP instance. [IBM's subsystem procedure](https://www.ibm.com/support/pages/node/645335) describes the required HTTP directives and routing objects.
+The HTTP server owns the listening socket, so submitting `CALL MCP4I/MCPHTTP` with `SBMJOB` would not create a working MCP listener.
 
-This direct-RPGLE approach is useful to explore because it makes the MCP boundary visible to IBM i developers. You can read the protocol handling, the fixed SQL, and the CGI output in one commented source file. It also makes the tradeoffs visible: HTTP configuration, character-set conversion, authority, protocol compatibility, and client testing all need attention.
+<details>
+<summary>Hinglish</summary>
 
-## How an IBM i developer can try it
+Listening socket HTTP server ke paas hota hai, isliye `SBMJOB` se `CALL MCP4I/MCPHTTP` submit karne par working MCP listener nahi banega.
 
-**If you are learning MCP first**, start with [Lesson 1](https://github.com/iNewTech/MCP4i/blob/main/docs/lesson-01-why-mcp.md) and [Lesson 2](https://github.com/iNewTech/MCP4i/blob/main/docs/lesson-02-mcp-architecture.md), then run the [completed local document demo](https://github.com/iNewTech/MCP4i/blob/main/cli_project_COMPLETE/README.md). It lets you see tool discovery and tool calls without needing an IBM i connection. The [course companion guide](https://github.com/iNewTech/MCP4i/blob/main/docs/anthropic-course-guide.md) maps these exercises to Anthropic Academy's introductory MCP course.
+</details>
 
-**If you have an authorized development partition**, follow the [RPGLE deployment guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md) in order. It covers copying the source to the IFS, creating `MCP4I`, compiling with `CRTSQLRPGI`, binding the CGI service program with `CRTPGM`, granting the CGI profile only needed authority, configuring a dedicated HTTP instance, and starting its subsystem and server. After that, run the repository's smoke test through an SSH tunnel or from a machine that can reach the endpoint:
+## What the RPGLE source actually handles
+
+The [request handler](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L91) checks the HTTP method, Origin, content type, and request size before it reads and parses the JSON body.
+
+<details>
+<summary>Hinglish</summary>
+
+Request handler JSON body padhne aur parse karne se pehle HTTP method, Origin, content type aur request size check karta hai.
+
+</details>
+
+The [MCP dispatcher](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L199) implements `initialize`, `notifications/initialized`, `ping`, `tools/list`, and `tools/call` for the 2025-11-25 request-response subset.
+
+<details>
+<summary>Hinglish</summary>
+
+MCP dispatcher 2025-11-25 ke request-response subset ke liye `initialize`, `notifications/initialized`, `ping`, `tools/list` aur `tools/call` implement karta hai.
+
+</details>
+
+During `tools/list`, the program advertises just one tool, `get_system_info`, with an empty input schema ([tool definition](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L205)).
+
+<details>
+<summary>Hinglish</summary>
+
+`tools/list` ke waqt program sirf ek tool, `get_system_info`, advertise karta hai, jiska input schema empty hai.
+
+</details>
+
+During `tools/call`, the program accepts only that tool name and runs a fixed read of `SYSIBMADM.ENV_SYS_INFO` rather than SQL supplied by a model ([tool call and SQL](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L213)).
+
+<details>
+<summary>Hinglish</summary>
+
+`tools/call` ke waqt program sirf wahi tool name accept karta hai aur model ke diye hue SQL ki jagah `SYSIBMADM.ENV_SYS_INFO` par fixed read chalata hai.
+
+</details>
+
+The result contains OS and host identity plus a local observation timestamp, and Db2 for i escapes the text before the [CGI response writer](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L299) returns it.
+
+<details>
+<summary>Hinglish</summary>
+
+Result mein OS aur host identity ke saath local observation timestamp hota hai, aur CGI response writer ke return karne se pehle Db2 for i text ko safely escape karta hai.
+
+</details>
+
+This is source code ready for a development-partition trial, not a claim that it has already compiled or passed a live IBM i test.
+
+<details>
+<summary>Hinglish</summary>
+
+Yeh source code development partition par try karne ke liye hai; iska matlab yeh nahi ki yeh IBM i par compile ya live test pass kar chuka hai.
+
+</details>
+
+## How to deploy the first program on IBM i
+
+The full [RPGLE deployment guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md) is the command-by-command reference for copying the source to the IFS, creating the library, granting authority, configuring HTTP, and verifying the endpoint.
+
+<details>
+<summary>Hinglish</summary>
+
+Puri RPGLE deployment guide source ko IFS mein copy karne, library banane, authority dene, HTTP configure karne aur endpoint verify karne ke liye command-by-command reference hai.
+
+</details>
+
+First, create the `MCP4I` library and the dedicated `MCPJOBQ`, `MCPJOBD`, `MCPCLS`, and `MCPSBS` objects using the guide's setup commands.
+
+<details>
+<summary>Hinglish</summary>
+
+Sabse pehle guide ke setup commands se `MCP4I` library aur dedicated `MCPJOBQ`, `MCPJOBD`, `MCPCLS` aur `MCPSBS` objects banao.
+
+</details>
+
+Next, copy `MCPHTTP.sqlrpgle` to your IFS build directory and compile and bind the one RPGLE program with these commands, adjusting the source path for your system.
+
+<details>
+<summary>Hinglish</summary>
+
+Phir `MCPHTTP.sqlrpgle` ko apni IFS build directory mein copy karo aur apne system ke source path ko adjust karke in commands se ek RPGLE program compile aur bind karo.
+
+</details>
+
+```cl
+CRTSQLRPGI OBJ(MCP4I/MCPHTTP) SRCSTMF('/home/builduser/MCP4i/MCPHTTP.sqlrpgle') OBJTYPE(*MODULE) COMMIT(*NONE) RDB(*NONE) OUTPUT(*PRINT)
+CRTPGM PGM(MCP4I/MCPHTTP) MODULE(MCP4I/MCPHTTP) BNDSRVPGM(QHTTPSVR/QZHBCGI)
+```
+
+Add the [HTTP configuration directives](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example) to a dedicated `MCP4I` HTTP instance so `/mcp` maps to the program and the instance uses the new job queue and subsystem.
+
+<details>
+<summary>Hinglish</summary>
+
+Dedicated `MCP4I` HTTP instance mein HTTP configuration directives add karo, taaki `/mcp` program se map ho aur instance nayi job queue aur subsystem use kare.
+
+</details>
+
+Start the subsystem before the HTTP instance, because IBM requires an active subsystem for jobs routed to a custom HTTP job queue ([IBM procedure](https://www.ibm.com/support/pages/node/645335)).
+
+<details>
+<summary>Hinglish</summary>
+
+HTTP instance se pehle subsystem start karo, kyunki custom HTTP job queue mein route hone wale jobs ke liye IBM active subsystem require karta hai.
+
+</details>
+
+```cl
+STRSBS SBSD(MCP4I/MCPSBS)
+STRTCPSVR SERVER(*HTTP) HTTPSVR(MCP4I)
+```
+
+If your operations process uses `SBMJOB`, submit the `STRTCPSVR` start command to an already running control queue rather than submitting the RPG CGI program itself ([batch-start explanation](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md#5-start-inspect-and-stop)).
+
+<details>
+<summary>Hinglish</summary>
+
+Agar operations process mein `SBMJOB` use hota hai, to RPG CGI program ko submit karne ke bajay `STRTCPSVR` start command ko pehle se running control queue mein submit karo.
+
+</details>
+
+The sample endpoint listens only on IBM i loopback, so use the guide's SSH tunnel or run the [smoke test](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/smoke_test.py) from a machine that can reach it.
+
+<details>
+<summary>Hinglish</summary>
+
+Sample endpoint sirf IBM i loopback par listen karta hai, isliye guide wala SSH tunnel use karo ya smoke test aisi machine se chalao jo endpoint tak pahunch sake.
+
+</details>
 
 ```sh
 python3 rpgle-mcp-server/smoke_test.py http://127.0.0.1:8088/mcp
 ```
 
-The smoke test asks the server to initialize, list tools, call `get_system_info`, and reject several invalid requests. A local Python interpreter runs the **test client**; Python is not part of the IBM i MCP server. The sample HTTP configuration listens on loopback only. To make a chat application use it, register a reachable MCP HTTP endpoint in that application's settings; the application will not find the server merely because the repository exists.
+The test covers initialization, tool discovery, one live `get_system_info` call, and rejection of several invalid requests; keep actual host names and system output out of public logs.
 
-## Where this can go next
+<details>
+<summary>Hinglish</summary>
 
-The [read-only tool roadmap](https://github.com/iNewTech/MCP4i/blob/main/project/phase-01-readonly-tools.md) describes focused capabilities IBM i teams ask for: library lists, object and file information, recorded program references, database relations, active jobs, job status, and later source reading. These are **planned contracts**, not currently advertised by the RPGLE server. The first implementation goal is to compile and verify its single system-information tool, then add another narrow tool with its own authority and result limits.
+Test initialization, tool discovery, ek live `get_system_info` call aur kuch invalid requests ki rejection check karta hai; actual host names aur system output public logs mein mat daalo.
 
-I also want the project to be useful beyond RPGLE. A non-IBM i developer can use the Python and TypeScript demos to learn the host–client–server flow, then help with an MCP client, documentation, validation, or user experience. An IBM i vendor could evaluate whether a product-specific, read-only MCP interface would help customers investigate supported metadata and diagnostics. That would require a clear support matrix, tenant and user authorization, audit records, bounded execution, and secure deployment—not just a tool description.
+</details>
 
-One boundary is deliberate: MCP4i does not currently offer arbitrary `run_cl`, program execution, job submission, or general SQL. A later `run_sql` tool would need more than a check that text starts with `SELECT`; the entire statement and reachable objects or routines would need review. The [Phase 1 roadmap](https://github.com/iNewTech/MCP4i/blob/main/project/phase-01-readonly-tools.md) explains the proposed constraints.
+## Practice the conversation flow with Ollama
 
-## Help shape the project
+If you do not have an IBM i development partition yet, use the [completed Python CLI](https://github.com/iNewTech/MCP4i/blob/main/cli_project_COMPLETE/README.md) to practice interactive MCP tool calls with local Ollama and sample documents.
 
-If you work with IBM i, I would value feedback on the first ten tool contracts and on the RPGLE build path. If you can test on a development partition, record the IBM i release and relevant PTF levels, share sanitized compile or protocol results, and open an [issue](https://github.com/iNewTech/MCP4i/issues) or pull request. Please keep real system names, credentials, source, and customer data out of public reports.
+<details>
+<summary>Hinglish</summary>
 
-Start at the [MCP4i repository](https://github.com/iNewTech/MCP4i). The most useful next milestone is simple and measurable: **compile the RPGLE program on IBM i, see `get_system_info` in an MCP client, call it, and verify the response against the partition.**
+Agar abhi IBM i development partition nahi hai, to completed Python CLI se local Ollama aur sample documents ke saath interactive MCP tool calls practice karo.
+
+</details>
+
+Its [document MCP server](https://github.com/iNewTech/MCP4i/blob/main/cli_project_COMPLETE/mcp_server.py), [client](https://github.com/iNewTech/MCP4i/blob/main/cli_project_COMPLETE/mcp_client.py), and [chat entry point](https://github.com/iNewTech/MCP4i/blob/main/cli_project_COMPLETE/main.py) show where tool registration, connection, and model interaction happen.
+
+<details>
+<summary>Hinglish</summary>
+
+Uska document MCP server, client aur chat entry point dikhate hain ki tool registration, connection aur model interaction code mein kahan hota hai.
+
+</details>
+
+The folder's README provides the current `uv`, Ollama model, and run commands, while the [Python starter](https://github.com/iNewTech/MCP4i/blob/main/cli_project/README.md) and [TypeScript starter](https://github.com/iNewTech/MCP4i/blob/main/cli_project_ts/README.md) let you work through the exercises yourself.
+
+<details>
+<summary>Hinglish</summary>
+
+Us folder ki README current `uv`, Ollama model aur run commands deti hai, aur Python aur TypeScript starters se tum exercises khud complete kar sakte ho.
+
+</details>
+
+These document demos are separate from the RPGLE IBM i server, and their in-memory editing tool is not an IBM i write capability.
+
+<details>
+<summary>Hinglish</summary>
+
+Yeh document demos RPGLE IBM i server se alag hain, aur inka in-memory editing tool IBM i par write karne ki capability nahi deta.
+
+</details>
+
+## The read-only roadmap and vendor opportunity
+
+The [Phase 1 roadmap](https://github.com/iNewTech/MCP4i/blob/main/project/phase-01-readonly-tools.md) proposes later tools for library lists, object and file metadata, program references, jobs, source reading, and carefully guarded SQL.
+
+<details>
+<summary>Hinglish</summary>
+
+Phase 1 roadmap mein aage library lists, object aur file metadata, program references, jobs, source reading aur carefully guarded SQL ke tools propose kiye gaye hain.
+
+</details>
+
+Those capabilities are designs, not tools already available from the current RPGLE server.
+
+<details>
+<summary>Hinglish</summary>
+
+Yeh capabilities abhi design mein hain; current RPGLE server se available tools nahi hain.
+
+</details>
+
+For IBM i vendors, a supported MCP interface could make product metadata or diagnostics available through narrow tools, but a real offering would also need authentication, tenant boundaries, auditability, performance limits, and a tested release matrix.
+
+<details>
+<summary>Hinglish</summary>
+
+IBM i vendors ke liye supported MCP interface product metadata ya diagnostics ko narrow tools se available kara sakta hai, lekin real offering ko authentication, tenant boundaries, auditability, performance limits aur tested release matrix bhi chahiye.
+
+</details>
+
+For general developers, the [learning chapters](https://github.com/iNewTech/MCP4i/tree/main/docs) and local demos provide a way to understand MCP before contributing a client, test, or user experience around IBM i.
+
+<details>
+<summary>Hinglish</summary>
+
+General developers ke liye learning chapters aur local demos IBM i ke aas-paas client, test ya user experience contribute karne se pehle MCP samajhne ka raasta dete hain.
+
+</details>
+
+The next meaningful result is a development-partition compile followed by a client discovering `get_system_info` and receiving a result checked against that same partition.
+
+<details>
+<summary>Hinglish</summary>
+
+Agla meaningful result development partition par compile karna hai, phir client mein `get_system_info` discover karke usi partition ke against checked result paana hai.
+
+</details>
+
+If you try it, share the IBM i release, relevant PTF level, and sanitized compile or smoke-test findings through a [GitHub issue](https://github.com/iNewTech/MCP4i/issues).
+
+<details>
+<summary>Hinglish</summary>
+
+Agar tum ise try karo, to IBM i release, relevant PTF level aur sanitized compile ya smoke-test findings GitHub issue mein share karo.
+
+</details>
