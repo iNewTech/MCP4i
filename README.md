@@ -4,6 +4,8 @@ Learn the Model Context Protocol (MCP) by designing, then building, an assistant
 
 The project connects AI concepts to familiar IBM i work: inspecting libraries and objects, understanding program dependencies, reading source, checking jobs, and querying approved data.
 
+New to the project? Read the [MCP4i article for IBM i developers](docs/blog-mcp4i-for-ibmi-developers.md) for the motivation, repository map, and ways to try it.
+
 **Current stage:** Lessons 1–10, Python and TypeScript CLI starters, and a completed Python document demo are available. The CLIs use local Ollama. A one-tool RPGLE MCP server is now in source form; IBM i compilation and a live connection remain unverified.
 
 ## Start learning
@@ -86,6 +88,7 @@ MCP4i/
 │   ├── README.md
 │   ├── 00-roadmap.md
 │   ├── anthropic-course-guide.md
+│   ├── blog-mcp4i-for-ibmi-developers.md
 │   ├── lesson-01-why-mcp.md
 │   ├── lesson-02-mcp-architecture.md
 │   ├── lesson-03-tool-contracts.md

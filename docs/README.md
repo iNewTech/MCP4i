@@ -1,6 +1,6 @@
 # MCP4i Learning Index
 
-[Repository home](../README.md) · [Roadmap](00-roadmap.md) · [Project scope](../project/phase-01-readonly-tools.md)
+[Repository home](../README.md) · [Project article](blog-mcp4i-for-ibmi-developers.md) · [Roadmap](00-roadmap.md) · [Project scope](../project/phase-01-readonly-tools.md)
 
 ## Available chapters
 
