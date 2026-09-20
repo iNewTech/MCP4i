@@ -50,7 +50,7 @@ dcl-pr QtmhWrStout extproc('QtmhWrStout');
 end-pr;
 
 // These prototypes are a map of the lesson. The first four procedures handle
-// transport and MCP routing; the next five define and execute our tool.
+// transport and MCP routing; tool registration/execution stays below them.
 dcl-pr handleRequest;
 end-pr;
 
@@ -65,7 +65,11 @@ end-pr;
 
 // TOOL REGISTRY: listTools joins tool definitions for tools/list.
 // TOOL DEFINITION: getSysInfoTool returns metadata, never reads IBM i data.
-dcl-pr listTools varchar(1024);
+dcl-pr listTools varchar(8192);
+end-pr;
+
+dcl-pr callRegisteredTool varchar(8192);
+  requestedTool varchar(64) const;
 end-pr;
 
 dcl-pr getSysInfoTool varchar(512);
@@ -260,15 +264,12 @@ dcl-proc dispatchRpcRequest;
     // This registry builds the list from each tool's definition procedure.
     resultJson = listTools();
   when methodName = 'tools/call';
-    // TOOL ROUTER: pair each advertised name with its execution procedure.
-    // Unknown names are JSON-RPC errors, not arbitrary RPG program calls.
-    select;
-    when toolName = SYS_INFO_TOOL;
-      resultJson = runSysInfoTool();
-    other;
+    // The generic MCP dispatcher does not change when a tool is added.
+    resultJson = callRegisteredTool(toolName);
+    if resultJson = '';
       sendHttp('200 OK': rpcError(idRaw: -32602: 'Unknown tool'): '');
       return;
-    endsl;
+    endif;
   other;
     sendHttp('200 OK': rpcError(idRaw: -32601: 'Method not found'): '');
     return;
@@ -280,16 +281,58 @@ dcl-proc dispatchRpcRequest;
            ',"result":' + resultJson + '}': '');
 end-proc;
 
-// TOOL REGISTRY: this is the one place where tools/list is assembled.
-// To add a second tool later, add its metadata procedure to this JSON array
-// and add its name/handler pair to the router above.
+// TOOL REGISTRY: put each tool definition into the RPG array below.
+// RPG array positions use parentheses: toolList(1), not toolList[1].
+// The loop adds JSON commas, so adding a tool needs no JSON punctuation here.
 dcl-proc listTools;
-  dcl-pi *n varchar(1024);
+  dcl-pi *n varchar(8192);
   end-pi;
+  dcl-s toolList varchar(512) dim(10);
+  dcl-s toolCount int(10) inz(1);
+  dcl-s toolIndex int(10);
+  dcl-s listJson varchar(8192) inz('{"tools":[');
   dcl-s sysInfoTool varchar(512);
+  // When getUserInfoTool() exists, declare this above the executable lines:
+  // dcl-s userInfoTool varchar(512);
 
+  // Tool 1: the only real tool in this lesson.
   sysInfoTool = getSysInfoTool();
-  return '{"tools":[' + sysInfoTool + ']}';
+  toolList(1) = sysInfoTool;
+
+  // Example for a FUTURE tool; these lines stay commented until it exists.
+  // Write getUserInfoTool() for metadata, runUserInfoTool() for execution,
+  // and add its WHEN in callRegisteredTool() below before enabling these:
+  // userInfoTool = getUserInfoTool();
+  // toolList(2) = userInfoTool;
+  // toolCount = 2;
+
+  // Build a JSON array from registered entries; do not add commas above.
+  for toolIndex = 1 to toolCount;
+    if toolIndex > 1;
+      listJson += ',';
+    endif;
+    listJson += %trim(toolList(toolIndex));
+  endfor;
+  return listJson + ']}';
+end-proc;
+
+// TOOL CALL ROUTER: only tool-specific names and handlers live here.
+// Add one WHEN for each active entry in listTools; leave the HTTP/JSON-RPC
+// procedures above unchanged. Empty means the requested tool is unknown.
+dcl-proc callRegisteredTool;
+  dcl-pi *n varchar(8192);
+    requestedTool varchar(64) const;
+  end-pi;
+  dcl-s toolResult varchar(8192) inz('');
+
+  select;
+  when requestedTool = SYS_INFO_TOOL;
+    toolResult = runSysInfoTool();
+  // Future example: match the "name" returned by getUserInfoTool().
+  // when requestedTool = 'get_user_info';
+  //   toolResult = runUserInfoTool();
+  endsl;
+  return toolResult;
 end-proc;
 
 // TOOL DEFINITION: only the public MCP name, description and input schema.

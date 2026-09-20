@@ -25,8 +25,9 @@ IBM HTTP Server for i — instance MCP4I, jobs in MCP4I/MCPSBS
 MCP4I/MCPHTTP *PGM (ILE RPG)
     ├── readHttpRequest → parseRpcRequest → dispatchRpcRequest
     ├── tools/list → listTools → getSysInfoTool (tool definition)
-    └── tools/call → runSysInfoTool → readSysInfo (fixed SELECT)
-                                    → asTextToolResult
+    └── tools/call → callRegisteredTool → runSysInfoTool
+                                         ├── readSysInfo (fixed SELECT)
+                                         └── asTextToolResult
     │ CGI JSON response
     ▼
 MCP client displays the tool result to the model
@@ -153,29 +154,47 @@ For a visual client, point the latest MCP Inspector at the **HTTP URL** rather t
 
 ## How the code works
 
-Each subprocedure has one job. Start at [`handleRequest`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L115), which only connects these stages:
+Each subprocedure has one job. Start at [`handleRequest`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L119), which only connects these stages:
 
 | Procedure | One responsibility |
 | --- | --- |
-| [`readHttpRequest`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L126) | Validate the HTTP request and read its bounded CGI body. |
-| [`parseRpcRequest`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L187) | Parse JSON-RPC fields and preserve the JSON type of the request ID. |
-| [`dispatchRpcRequest`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L247) | Route MCP methods, including `tools/list` and `tools/call`. |
-| [`listTools`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L283) | Put tool definitions in the `tools/list` response. This is the **tool registry**. |
-| [`getSysInfoTool`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L295) | Construct only the `get_system_info` name, description, and input schema. This is the **tool definition**. |
-| [`runSysInfoTool`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L308) | Coordinate execution of that one tool and return an MCP tool result. |
-| [`readSysInfo`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L326) | Run the fixed read of [ENV_SYS_INFO](https://www.ibm.com/docs/ssw_ibm_i_76/rzajq/rzajqviewenvinfo.htm); no caller-supplied SQL reaches this procedure. |
-| [`asTextToolResult`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L349) | Escape the returned data and form the MCP `content` result. |
-| [`getEnv`, `rpcError`, `sendHttp`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L373) | Handle CGI variables, JSON-RPC errors, and CGI output. |
+| [`readHttpRequest`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L130) | Validate the HTTP request and read its bounded CGI body. |
+| [`parseRpcRequest`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L191) | Parse JSON-RPC fields and preserve the JSON type of the request ID. |
+| [`dispatchRpcRequest`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L251) | Route MCP methods, including `tools/list` and `tools/call`. |
+| [`listTools`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L287) | Put tool definitions in the `tools/list` response. This is the **tool registry**. |
+| [`callRegisteredTool`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L322) | Match a registered tool name to its execution procedure. The generic request dispatcher never needs a new tool-specific branch. |
+| [`getSysInfoTool`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L340) | Construct only the `get_system_info` name, description, and input schema. This is the **tool definition**. |
+| [`runSysInfoTool`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L353) | Coordinate execution of that one tool and return an MCP tool result. |
+| [`readSysInfo`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L371) | Run the fixed read of [ENV_SYS_INFO](https://www.ibm.com/docs/ssw_ibm_i_76/rzajq/rzajqviewenvinfo.htm); no caller-supplied SQL reaches this procedure. |
+| [`asTextToolResult`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L394) | Escape the returned data and form the MCP `content` result. |
+| [`getEnv`, `rpcError`, `sendHttp`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L416) | Handle CGI variables, JSON-RPC errors, and CGI output. |
 
-The key distinction is **defining a tool versus running it**. `getSysInfoTool` makes the public contract; `readSysInfo` reads IBM i. In `listTools`, the line below makes the definition easy to find:
+The key distinction is **defining a tool versus running it**. `getSysInfoTool` makes the public contract; `readSysInfo` reads IBM i. In `listTools`, each tool definition gets one array position. RPG arrays use parentheses, so the second entry is `toolList(2)`:
 
 ```rpgle
-dcl-s sysInfoTool varchar(512);
+// In the declaration section at the top of listTools:
+// dcl-s userInfoTool varchar(512);
+
 sysInfoTool = getSysInfoTool();
-return '{"tools":[' + sysInfoTool + ']}';
+toolList(1) = sysInfoTool;
+
+// After you write getUserInfoTool() and its execution handler,
+// uncomment the declaration above and these three lines:
+// userInfoTool = getUserInfoTool();
+// toolList(2) = userInfoTool;
+// toolCount = 2;
 ```
 
-When the client calls `get_system_info`, the [`tools/call` router](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L262) maps that name to `runSysInfoTool`. To add another read-only tool later, give it one definition procedure and one execution procedure, add its definition to `listTools`, and add its name/handler pair to the router. Update the live smoke test to check that the new tool appears and works. Do not put the SQL query inside the metadata procedure: the client needs the description during discovery, but should read IBM i only when it calls the tool.
+The matching call is added next to the current tool in `callRegisteredTool`:
+
+```rpgle
+// when requestedTool = 'get_user_info';
+//   toolResult = runUserInfoTool();
+```
+
+`toolCount` is the number of **active** array entries. The loop in `listTools` joins entries with commas and returns `{"tools":[...]}`; you never hand-write a comma when registering a tool. The example `getUserInfoTool()` is **not implemented yet** and remains commented out. When the client calls `get_system_info`, `callRegisteredTool` maps that name to `runSysInfoTool`. To add another read-only tool later, write its metadata and execution procedures, add its definition in `listTools`, and add one `WHEN` in `callRegisteredTool`; then extend the live smoke test. **Do not edit `readHttpRequest`, `parseRpcRequest`, or `dispatchRpcRequest` to add a tool.** The SQL query belongs in the execution procedure, not in the metadata procedure.
+
+For now, the tool procedures stay in this one RPG program so the entire path is visible while learning. Moving each tool into its own bound module can come later without changing this HTTP/JSON-RPC flow.
 
 ## Boundaries and next milestone
 

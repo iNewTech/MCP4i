@@ -38,21 +38,75 @@ MCP client → model and user
 
 ## What the RPGLE source actually handles
 
-The [request handler](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L126) checks the HTTP method, Origin, content type, and request size before it reads and parses the JSON body. The [MCP dispatcher](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L247) implements `initialize`, `notifications/initialized`, `ping`, `tools/list`, and `tools/call` for the 2025-11-25 request-response subset. During `tools/list`, the program advertises just one tool, `get_system_info`, with an empty input schema ([tool definition](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L295)).
+The [request handler](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L130) checks the HTTP method, Origin, content type, and request size before it reads and parses the JSON body. The [MCP dispatcher](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L251) implements `initialize`, `notifications/initialized`, `ping`, `tools/list`, and `tools/call` for the 2025-11-25 request-response subset. During `tools/list`, the program advertises just one tool, `get_system_info`, with an empty input schema ([tool definition](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L340)). The [`listTools` registry](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L287) holds the tool definitions, so a new tool does not require changes to the HTTP or JSON-RPC request procedures.
 
 <details>
 <summary>Hinglish</summary>
 
-Request handler JSON body padhne aur parse karne se pehle HTTP method, Origin, content type aur request size check karta hai. MCP dispatcher 2025-11-25 ke request-response subset ke liye `initialize`, `notifications/initialized`, `ping`, `tools/list` aur `tools/call` implement karta hai. `tools/list` ke waqt program sirf ek tool, `get_system_info`, advertise karta hai, jiska input schema empty hai.
+Request handler JSON body padhne aur parse karne se pehle HTTP method, Origin, content type aur request size check karta hai. MCP dispatcher 2025-11-25 ke request-response subset ke liye `initialize`, `notifications/initialized`, `ping`, `tools/list` aur `tools/call` implement karta hai. `tools/list` ke waqt program sirf ek tool, `get_system_info`, advertise karta hai, jiska input schema empty hai. `listTools` registry tool definitions rakhti hai; naya tool add karne ke liye HTTP ya JSON-RPC request procedures badalne ki zarurat nahi hai.
 
 </details>
 
-During `tools/call`, the program accepts only that tool name and runs a fixed read of `SYSIBMADM.ENV_SYS_INFO` rather than SQL supplied by a model ([tool handler](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L308) and [fixed SQL](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L328)). The result contains OS and host identity plus a local observation timestamp, and Db2 for i escapes the text before the [CGI response writer](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L407) returns it. This is source code ready for a development-partition trial, not a claim that it has already compiled or passed a live IBM i test.
+During `tools/call`, the program accepts only that tool name and runs a fixed read of `SYSIBMADM.ENV_SYS_INFO` rather than SQL supplied by a model ([tool handler](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L353) and [fixed SQL](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L371)). The [`callRegisteredTool` router](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L322) maps that name to its execution procedure. The result contains OS and host identity plus a local observation timestamp, and Db2 for i escapes the text before the [CGI response writer](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L450) returns it. This is source code ready for a development-partition trial, not a claim that it has already compiled or passed a live IBM i test.
 
 <details>
 <summary>Hinglish</summary>
 
-`tools/call` ke waqt program sirf wahi tool name accept karta hai aur model ke diye hue SQL ki jagah `SYSIBMADM.ENV_SYS_INFO` par fixed read chalata hai. Result mein OS aur host identity ke saath local observation timestamp hota hai, aur CGI response writer ke return karne se pehle Db2 for i text ko safely escape karta hai. Yeh source code development partition par try karne ke liye hai; iska matlab yeh nahi ki yeh IBM i par compile ya live test pass kar chuka hai.
+`tools/call` ke waqt program sirf wahi tool name accept karta hai aur model ke diye hue SQL ki jagah `SYSIBMADM.ENV_SYS_INFO` par fixed read chalata hai. `callRegisteredTool` router us tool name ko execution procedure se jodta hai. Result mein OS aur host identity ke saath local observation timestamp hota hai, aur CGI response writer ke return karne se pehle Db2 for i text ko safely escape karta hai. Yeh source code development partition par try karne ke liye hai; iska matlab yeh nahi ki yeh IBM i par compile ya live test pass kar chuka hai.
+
+</details>
+
+## How to add a new read-only tool
+
+Suppose you want a `get_user_info` tool. In [MCPHTTP.sqlrpgle](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle), write one procedure that describes the tool and another that runs its read-only IBM i lookup. Declare prototypes alongside the existing `getSysInfoTool` and `runSysInfoTool` prototypes, then follow those procedures as examples: `getUserInfoTool` returns the public name, description, and `inputSchema`; `runUserInfoTool` performs a fixed read and returns an MCP `content` result or an `isError` result. Keep the lookup out of the metadata procedure, and never accept model-supplied SQL as the lookup.
+
+<details>
+<summary>Hinglish</summary>
+
+Maan lo tum `get_user_info` tool banana chahte ho. `MCPHTTP.sqlrpgle` mein ek procedure tool ka description banayega aur doosra IBM i par uska read-only lookup chalayega. Existing `getSysInfoTool` aur `runSysInfoTool` prototypes ke paas naye prototypes declare karo, phir un procedures ka pattern follow karo: `getUserInfoTool` public name, description aur `inputSchema` return kare; `runUserInfoTool` fixed read chalakar MCP `content` result ya `isError` result return kare. Lookup ko metadata procedure mein mat rakho, aur model se SQL lekar query mat chalao.
+
+</details>
+
+Once those procedures exist, add the definition to [`listTools`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L287). The program already has this future example as comments; enable it when the new procedure is real. Declare `userInfoTool` with the other local variables at the top of `listTools`, then put these lines after the existing `toolList(1)` assignment. `toolCount` must equal the number of active entries, and the loop builds the JSON array and commas for you.
+
+<details>
+<summary>Hinglish</summary>
+
+Jab dono procedures ready hon, definition ko `listTools` mein register karo. Program mein future example comments ke roop mein pehle se diya hai; naya procedure sach mein banne par use enable karo. `listTools` ke top par baaki local variables ke saath `userInfoTool` declare karo, phir existing `toolList(1)` assignment ke baad yeh lines add karo. `toolCount` ko active entries ki ginti ke barabar rakho; loop JSON array aur commas khud banata hai.
+
+</details>
+
+```rpgle
+// Declare with the other dcl-s lines inside listTools:
+dcl-s userInfoTool varchar(512);
+
+// Add after toolList(1) = sysInfoTool:
+userInfoTool = getUserInfoTool();
+toolList(2) = userInfoTool;
+toolCount = 2;
+```
+
+Next, add the call handler in [`callRegisteredTool`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L322), beside the existing `SYS_INFO_TOOL` branch. The name must exactly match the `name` returned by `getUserInfoTool`; otherwise Inspector may list the tool but its call will fail. This is the only tool-specific routing change: `readHttpRequest`, `parseRpcRequest`, and `dispatchRpcRequest` remain untouched.
+
+<details>
+<summary>Hinglish</summary>
+
+Agla step `callRegisteredTool` mein existing `SYS_INFO_TOOL` branch ke paas call handler add karna hai. Name bilkul wahi hona chahiye jo `getUserInfoTool` ke `name` field mein return hota hai; warna Inspector tool dikha sakta hai, lekin call fail hoga. Tool-specific routing mein sirf yahi change chahiye: `readHttpRequest`, `parseRpcRequest` aur `dispatchRpcRequest` ko touch nahi karna.
+
+</details>
+
+```rpgle
+// Add inside callRegisteredTool's SELECT, before ENDSL:
+when requestedTool = 'get_user_info';
+  toolResult = runUserInfoTool();
+```
+
+Finally, compile the updated program on your IBM i development partition and extend the [smoke test](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/smoke_test.py) to check that `tools/list` shows the new name and `tools/call` returns its expected data. The snippets above register and route a tool; they do not implement `get_user_info` by themselves. The complete, current example remains [`get_system_info`](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L340).
+
+<details>
+<summary>Hinglish</summary>
+
+Aakhir mein updated program ko IBM i development partition par compile karo aur smoke test badhao, taaki `tools/list` mein naya naam aur `tools/call` mein expected data verify ho. Upar wale snippets tool ko register aur route karte hain; woh apne aap `get_user_info` implement nahi karte. Abhi complete example `get_system_info` hi hai.
 
 </details>
 
