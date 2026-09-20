@@ -20,6 +20,10 @@
 
 The [Phase 1 tool roadmap](../project/phase-01-readonly-tools.md) accompanies the full curriculum. It describes intended capabilities, not installed tools.
 
+## Companion course
+
+If you are taking [Anthropic Academy's Introduction to Model Context Protocol](https://anthropic.skilljar.com/introduction-to-model-context-protocol/303756), use the [course-to-MCP4i guide](anthropic-course-guide.md) to pair its sections with these chapters. The course's Python and document-management exercises teach MCP mechanics; the project homework applies those mechanics to authorized IBM i reads.
+
 ## How to study a lesson
 
 1. Read the objectives and attempt the opening question before consulting the explanation.
@@ -39,4 +43,4 @@ No homework has been graded in this repository. Keep personal answers and review
 
 ## Implementation boundary
 
-Lessons 1–10 are now available as study material. The runtime server, IBM i connection, and implementation exercises remain future work. Implementation begins only after the design review for M1 and an explicit implementation task.
+Lessons 1–10 are now available as study material. A separate [one-tool RPGLE server](../rpgle-mcp-server/README.md) has source and deployment instructions, but has not been compiled or tested on IBM i. The course's remaining implementation exercises and live connection still require validation.

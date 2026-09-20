@@ -10,6 +10,8 @@ A mock server is a small stand-in that returns predictable, labeled data. It let
 
 The mock must make its fiction obvious. It is useful for protocol behavior, not proof that an IBM i backend works.
 
+For the later Python exercise, Astral's [uv guide](https://docs.astral.sh/uv/) links to [installation methods](https://docs.astral.sh/uv/getting-started/installation/) for macOS, Linux, and Windows. Check the installation with `uv --version` before following a course setup demonstration. This chapter's paper exercise does not require installing it.
+
 ## 1. The smallest useful slice
 
 Implement later only one capability first: `get_system_info` with an empty argument object and a fixed fictional response. The host should be able to discover the tool, propose a call, receive a result, and show the evidence.

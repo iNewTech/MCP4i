@@ -1,0 +1,29 @@
+# Add these directives to the MCP4I IBM HTTP Server instance configuration.
+# Create the instance in IBM Web Administration for i first. If it already has
+# Listen or ServerName directives, edit those instead of duplicating them.
+# The first deployment is loopback-only; reach it with an SSH tunnel.
+Listen 127.0.0.1:8088
+ServerName localhost:8088
+
+# IBM's supported HTTPStartJob* settings place this instance's server jobs
+# on our dedicated queue and subsystem. The subsystem must be active.
+HTTPStartJobQueue MCP4I/MCPJOBQ
+HTTPStartJobDesc MCP4I/MCPJOBD
+HTTPRoutingData MCPHTTP
+HTTPSubsystemDesc MCP4I/MCPSBS
+
+# Convert JSON request UTF-8 to the CGI job CCSID and output back to UTF-8.
+# Adjust CGIJobCCSID to the deployment's chosen EBCDIC job CCSID if needed.
+DefaultNetCCSID 1208
+CGIJobCCSID 37
+CGIConvMode EBCDIC
+
+# Map only this program, not the whole library, to the MCP endpoint.
+ScriptAlias /mcp /QSYS.LIB/MCP4I.LIB/MCPHTTP.PGM
+<Directory /QSYS.LIB/MCP4I.LIB/>
+    AllowOverride None
+    Options +ExecCGI
+    SetHandler cgi-script
+    Require local
+    LimitRequestBody 16384
+</Directory>

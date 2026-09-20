@@ -25,22 +25,24 @@ For every design decision, explain the user need, the input and output, the allo
 
 ## Chapter sequence
 
-Lessons 1–10 are now written as study material. The rows define the intended order and project gates; implementation remains future work.
+Lessons 1–10 are now written as study material. The rows define the intended order and project gates. One experimental [RPGLE MCP server](../rpgle-mcp-server/README.md) is available in source form; IBM i compilation and live verification remain open.
 
 | Chapter | Learn | Project contribution |
 | --- | --- | --- |
 | [01 — Why MCP?](lesson-01-why-mcp.md) | Model knowledge, live evidence, tool use, standardized integration | Explain the customer problem and read-only scope |
 | [02 — MCP Architecture](lesson-02-mcp-architecture.md) | Host/client/server responsibilities; tools, resources, prompts; request flow | M1: draw the system and design ten tool contracts |
-| 03 — Tool contracts and boundaries | Names, descriptions, input rules, output shapes, errors, authority | Review contracts and select compatible host, protocol, and SDK versions |
-| 04 — First mock MCP server | Discovery, calling one tool, inspecting results | M2: fictional `get_system_info` demonstration |
-| 05 — Connect to IBM i | Identity, connection configuration, IBM i Services, release support | M3: first verified read on a development partition |
-| 06 — Libraries, objects, and references | Naming, library-list context, metadata, dependency limitations | M4: focused inspection tools; defer unsupported methods |
-| 07 — Guarded SQL reads | SELECT subset, nested operations, routine access, result and execution limits | M4: `run_sql` only after the SQL boundary review |
-| 08 — Jobs, source, and logs | Qualified job IDs, source members, paging, timestamps, sensitive fields | M4: bounded operational and source reads |
-| 09 — Resources, prompts, and answer quality | Context selection, reusable workflows, evidence, misleading retrieved text | Candidate schema resources and diagnostic prompts; evaluation cases |
-| 10 — Operate and demonstrate | Logging, recovery, latency, capacity, access checks, workflow impact | M5: reproducible demo and operating guide |
+| [03 — Tool contracts and boundaries](lesson-03-tool-contracts.md) | Names, descriptions, input rules, output shapes, errors, authority | Review contracts and select compatible host, protocol, and SDK versions |
+| [04 — First mock MCP server](lesson-04-first-mock-server.md) | Discovery, calling one tool, inspecting results | M2: fictional `get_system_info` demonstration |
+| [05 — Connect to IBM i](lesson-05-connect-to-ibmi.md) | Identity, connection configuration, IBM i Services, release support | M3: first verified read on a development partition |
+| [06 — Libraries, objects, and references](lesson-06-inspection-tools.md) | Naming, library-list context, metadata, dependency limitations | M4: focused inspection tools; defer unsupported methods |
+| [07 — Guarded SQL reads](lesson-07-guarded-sql.md) | SELECT subset, nested operations, routine access, result and execution limits | M4: `run_sql` only after the SQL boundary review |
+| [08 — Jobs, source, and logs](lesson-08-jobs-source-logs.md) | Qualified job IDs, source members, paging, timestamps, sensitive fields | M4: bounded operational and source reads |
+| [09 — Resources, prompts, and answer quality](lesson-09-resources-prompts-evaluation.md) | Context selection, reusable workflows, evidence, misleading retrieved text | Candidate schema resources and diagnostic prompts; evaluation cases |
+| [10 — Operate and demonstrate](lesson-10-operate-and-demonstrate.md) | Logging, recovery, latency, capacity, access checks, workflow impact | M5: reproducible demo and operating guide |
 
 Security and failure handling belong in every chapter. Chapter 10 consolidates the evidence. RAG (retrieving relevant material before answering) and agents with longer tool workflows are later extensions, after the read-only foundation is reliable.
+
+For learners following Anthropic Academy's introductory MCP course, the [companion guide](anthropic-course-guide.md) maps its video and exercise sections to this sequence.
 
 ## Milestones and gates
 
@@ -53,7 +55,7 @@ Security and failure handling belong in every chapter. Chapter 10 consolidates t
 | M4 — Broaden the catalogue | Each enabled tool has a verified backend, bounded output, documented limitations, and access checks; SQL passes its separate gate |
 | M5 — Demonstrate reliability | Repeatable success and failure cases, supported-system notes, operating instructions, and observed workflow measurements |
 
-**Current position:** M0 documentation is available; M1 is the next design exercise. No learner assessment, runtime milestone, or IBM i compatibility check is recorded as passed.
+**Current position:** M0 documentation is available; M1 is the next design exercise. The RPGLE server source has not passed a runtime milestone or IBM i compatibility check, and no learner assessment is recorded as passed.
 
 At each review, change one constraint. For example: “The support team now has 20 users,” or “Program-reference metadata is unavailable on this partition.” Defend which part of the design changes and why. Fix individual failed checks before advancing; an average quiz score does not override them.
 
