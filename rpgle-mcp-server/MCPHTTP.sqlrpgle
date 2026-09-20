@@ -2,6 +2,7 @@
 // One ILE RPG program is both the MCP protocol handler and the IBM i reader.
 // IBM HTTP Server invokes it as CGI for each POST /mcp request.
 // Read this file top to bottom: CGI input -> JSON-RPC dispatch -> CGI output.
+// Tool metadata and tool execution live in separate named subprocedures.
 // Only the fixed get_system_info tool touches IBM i data in this lesson.
 ctl-opt dftactgrp(*no) actgrp(*caller) option(*srcstmt:*nodebugio);
 
@@ -12,6 +13,7 @@ exec sql set option commit = *none, naming = *sql;
 // MAX_BODY is also the advertised HTTP LimitRequestBody in the config file.
 dcl-c LF x'15';
 dcl-c MAX_BODY 16384;
+dcl-c SYS_INFO_TOOL 'get_system_info';
 
 // IBM's QUSEC API error structure. Supplying 16 bytes returns error details
 // instead of sending an unhandled escape message into the CGI job.
@@ -47,8 +49,37 @@ dcl-pr QtmhWrStout extproc('QtmhWrStout');
   errorCode likeds(apiError);
 end-pr;
 
-// Local procedure prototypes make the four steps in the program explicit.
+// These prototypes are a map of the lesson. The first four procedures handle
+// transport and MCP routing; the next five define and execute our tool.
 dcl-pr handleRequest;
+end-pr;
+
+dcl-pr readHttpRequest ind;
+end-pr;
+
+dcl-pr parseRpcRequest ind;
+end-pr;
+
+dcl-pr dispatchRpcRequest;
+end-pr;
+
+// TOOL REGISTRY: listTools joins tool definitions for tools/list.
+// TOOL DEFINITION: getSysInfoTool returns metadata, never reads IBM i data.
+dcl-pr listTools varchar(1024);
+end-pr;
+
+dcl-pr getSysInfoTool varchar(512);
+end-pr;
+
+// TOOL EXECUTION: runSysInfoTool coordinates the fixed read and MCP result.
+dcl-pr runSysInfoTool varchar(8192);
+end-pr;
+
+dcl-pr readSysInfo varchar(4096);
+end-pr;
+
+dcl-pr asTextToolResult varchar(8192);
+  systemJson varchar(4096) const;
 end-pr;
 
 dcl-pr getEnv varchar(1024);
@@ -67,21 +98,14 @@ dcl-pr sendHttp;
   extraHeader varchar(128) const;
 end-pr;
 
-// Fixed-size input and output buffers keep this tutorial's request bounded.
+// Only values shared across request stages are global. Each CGI invocation
+// handles one request; subprocedure-only buffers are declared locally below.
 // An arbitrary SQL runner or caller-selected IBM i system is not present.
 dcl-s requestJson varchar(MAX_BODY);
-dcl-s rawInput char(MAX_BODY);
-dcl-s contentLength int(10);
-dcl-s bytesRead int(10);
 dcl-s methodName varchar(64);
 dcl-s rpcVersion varchar(16);
 dcl-s toolName varchar(64);
-dcl-s idWrapped varchar(512);
 dcl-s idRaw varchar(510);
-dcl-s validJson int(10);
-dcl-s resultJson varchar(16384);
-dcl-s systemJson varchar(4096);
-dcl-s contentJson varchar(8192);
 
 // CGI starts here once per HTTP request. There is no forever loop or SBMJOB.
 handleRequest();
@@ -89,23 +113,39 @@ handleRequest();
 return;
 
 dcl-proc handleRequest;
+  // The main procedure is a reading map: HTTP -> JSON-RPC -> MCP response.
+  if readHttpRequest() = *off;
+    return;
+  endif;
+  if parseRpcRequest() = *off;
+    return;
+  endif;
+  dispatchRpcRequest();
+end-proc;
+
+dcl-proc readHttpRequest;
+  dcl-pi *n ind;
+  end-pi;
   dcl-s lengthText varchar(1024);
   dcl-s httpMethod varchar(1024);
   dcl-s contentType varchar(1024);
+  dcl-s contentLength int(10);
+  dcl-s bytesRead int(10);
+  dcl-s rawInput char(MAX_BODY);
 
   // Streamable HTTP sends MCP messages by POST. GET would require a server
   // event stream, which this first one-tool version does not implement.
   httpMethod = getEnv('REQUEST_METHOD');
   if httpMethod <> 'POST';
     sendHttp('405 Method Not Allowed': '': 'Allow: POST');
-    return;
+    return *off;
   endif;
 
   // Reject browser-origin requests to avoid DNS-rebinding exposure. The
   // sample listener is loopback-only; remote deployment needs its own policy.
   if getEnv('HTTP_ORIGIN') <> '';
     sendHttp('403 Forbidden': '': '');
-    return;
+    return *off;
   endif;
 
   // CGI supplies CONTENT_TYPE without an HTTP_ prefix. A charset suffix is
@@ -115,7 +155,7 @@ dcl-proc handleRequest;
                        getEnv('CONTENT_TYPE'));
   if %scan('application/json': contentType) <> 1;
     sendHttp('415 Unsupported Media Type': '': '');
-    return;
+    return *off;
   endif;
 
   // Check digits and width BEFORE %INT, so an oversized number cannot cause
@@ -124,12 +164,12 @@ dcl-proc handleRequest;
   if lengthText = '' or %len(lengthText) > 5 or
      %check('0123456789': lengthText) <> 0;
     sendHttp('400 Bad Request': '': '');
-    return;
+    return *off;
   endif;
   contentLength = %int(lengthText);
   if contentLength < 1 or contentLength > MAX_BODY;
     sendHttp('413 Content Too Large': '': '');
-    return;
+    return *off;
   endif;
 
   // QtmhRdStin provides the body already converted to the CGI job CCSID by
@@ -138,9 +178,17 @@ dcl-proc handleRequest;
   QtmhRdStin(rawInput: contentLength: bytesRead: apiError);
   if bytesRead <> contentLength or apiError.bytesAvailable > 0;
     sendHttp('400 Bad Request': '': '');
-    return;
+    return *off;
   endif;
   requestJson = %subst(rawInput: 1: bytesRead);
+  return *on;
+end-proc;
+
+dcl-proc parseRpcRequest;
+  dcl-pi *n ind;
+  end-pi;
+  dcl-s validJson int(10);
+  dcl-s idWrapped varchar(512);
 
   // Db2 for i parses JSON; no substring matching of method or tool names.
   // The unique-key check avoids accepting ambiguous JSON such as two methods.
@@ -153,7 +201,7 @@ dcl-proc handleRequest;
       from sysibm.sysdummy1;
   if sqlcode <> 0 or validJson <> 1;
     sendHttp('200 OK': rpcError('null': -32700: 'Parse error'): '');
-    return;
+    return *off;
   endif;
 
   exec sql
@@ -169,7 +217,7 @@ dcl-proc handleRequest;
       from sysibm.sysdummy1;
   if sqlcode <> 0;
     sendHttp('200 OK': rpcError('null': -32600: 'Invalid Request'): '');
-    return;
+    return *off;
   endif;
 
   // JSON_QUERY with an array wrapper gives [1] or ["abc"]. Removing the
@@ -186,12 +234,18 @@ dcl-proc handleRequest;
     else;
       sendHttp('200 OK': rpcError('null': -32600: 'Invalid Request'): '');
     endif;
-    return;
+    return *off;
   endif;
   if rpcVersion <> '2.0';
     sendHttp('200 OK': rpcError(idRaw: -32600: 'Invalid Request'): '');
-    return;
+    return *off;
   endif;
+
+  return *on;
+end-proc;
+
+dcl-proc dispatchRpcRequest;
+  dcl-s resultJson varchar(16384);
 
   // MCP lifecycle first: initialize announces protocol and tools capability.
   // The client then sends notifications/initialized (handled above with 202).
@@ -203,54 +257,18 @@ dcl-proc handleRequest;
   when methodName = 'ping';
     resultJson = '{}';
   when methodName = 'tools/list';
-    // Discovery tells a client/model the exact tool name and empty input
-    // schema. No CL, SQL, or program-execution tool is advertised.
-    resultJson = '{"tools":[{"name":"get_system_info",' +
-      '"description":"Read IBM i OS and host identity from ' +
-      'SYSIBMADM.ENV_SYS_INFO.",' +
-      '"inputSchema":{"type":"object","properties":{},' +
-      '"additionalProperties":false}}]}';
+    // This registry builds the list from each tool's definition procedure.
+    resultJson = listTools();
   when methodName = 'tools/call';
-    // Dispatch only the advertised name. Unknown tools are JSON-RPC errors.
-    if toolName <> 'get_system_info';
+    // TOOL ROUTER: pair each advertised name with its execution procedure.
+    // Unknown names are JSON-RPC errors, not arbitrary RPG program calls.
+    select;
+    when toolName = SYS_INFO_TOOL;
+      resultJson = runSysInfoTool();
+    other;
       sendHttp('200 OK': rpcError(idRaw: -32602: 'Unknown tool'): '');
       return;
-    endif;
-    // This SELECT is fixed in source; the model supplies no SQL or object
-    // name. ENV_SYS_INFO describes the local partition running this CGI job.
-    exec sql
-      select json_object(
-               'os_name' value os_name,
-               'os_version' value os_version,
-               'os_release' value os_release,
-               'host_name' value host_name,
-               'observed_at_local' value char(current_timestamp)
-               returning varchar(4096))
-        into :systemJson
-        from sysibmadm.env_sys_info;
-    if sqlcode <> 0;
-      // A tool execution failure is an MCP tool result with isError=true.
-      // Do not expose database error text or host details in the response.
-      resultJson = '{"content":[{"type":"text",' +
-        '"text":"System information is unavailable."}],' +
-        '"isError":true}';
-    else;
-      // The first JSON_OBJECT created systemJson. This second JSON_OBJECT
-      // escapes it as a text value, so quotes cannot corrupt the MCP envelope.
-      exec sql
-        values json_object('type' value 'text',
-                           'text' value :systemJson
-                           returning varchar(8192))
-          into :contentJson;
-      if sqlcode <> 0;
-        resultJson = '{"content":[{"type":"text",' +
-          '"text":"Could not format system information."}],' +
-          '"isError":true}';
-      else;
-        resultJson = '{"content":[' + %trim(contentJson) +
-          '],"isError":false}';
-      endif;
-    endif;
+    endsl;
   other;
     sendHttp('200 OK': rpcError(idRaw: -32601: 'Method not found'): '');
     return;
@@ -260,6 +278,96 @@ dcl-proc handleRequest;
   // assembled only from known literals or JSON produced by Db2 for i.
   sendHttp('200 OK': '{"jsonrpc":"2.0","id":' + idRaw +
            ',"result":' + resultJson + '}': '');
+end-proc;
+
+// TOOL REGISTRY: this is the one place where tools/list is assembled.
+// To add a second tool later, add its metadata procedure to this JSON array
+// and add its name/handler pair to the router above.
+dcl-proc listTools;
+  dcl-pi *n varchar(1024);
+  end-pi;
+  dcl-s sysInfoTool varchar(512);
+
+  sysInfoTool = getSysInfoTool();
+  return '{"tools":[' + sysInfoTool + ']}';
+end-proc;
+
+// TOOL DEFINITION: only the public MCP name, description and input schema.
+// No Db2 query, CGI operation, or tool execution belongs in this procedure.
+dcl-proc getSysInfoTool;
+  dcl-pi *n varchar(512);
+  end-pi;
+
+  return '{"name":"' + SYS_INFO_TOOL + '",' +
+    '"description":"Read IBM i OS and host identity from ' +
+    'SYSIBMADM.ENV_SYS_INFO.",' +
+    '"inputSchema":{"type":"object","properties":{},' +
+    '"additionalProperties":false}}';
+end-proc;
+
+// TOOL HANDLER: translate the fixed read into a successful or failed MCP
+// result. The caller cannot pass SQL, an object name, or another partition.
+dcl-proc runSysInfoTool;
+  dcl-pi *n varchar(8192);
+  end-pi;
+  dcl-s systemJson varchar(4096);
+
+  systemJson = readSysInfo();
+  if systemJson = '';
+    // A tool failure is an MCP result with isError=true. Never return the
+    // database error text or internal host details to the client.
+    return '{"content":[{"type":"text",' +
+      '"text":"System information is unavailable."}],' +
+      '"isError":true}';
+  endif;
+  return asTextToolResult(systemJson);
+end-proc;
+
+// IBM i READ: this is the only procedure that queries system information.
+// The SELECT is fixed in source and describes the local CGI partition.
+dcl-proc readSysInfo;
+  dcl-pi *n varchar(4096);
+  end-pi;
+  dcl-s systemJson varchar(4096) inz('');
+
+  exec sql
+    select json_object(
+             'os_name' value os_name,
+             'os_version' value os_version,
+             'os_release' value os_release,
+             'host_name' value host_name,
+             'observed_at_local' value char(current_timestamp)
+             returning varchar(4096))
+      into :systemJson
+      from sysibmadm.env_sys_info;
+  if sqlcode <> 0;
+    return '';
+  endif;
+  return %trim(systemJson);
+end-proc;
+
+// MCP RESULT FORMATTER: JSON_OBJECT escapes the JSON document as one text
+// value, so quotation marks in IBM i data cannot corrupt the MCP envelope.
+dcl-proc asTextToolResult;
+  dcl-pi *n varchar(8192);
+    systemJson varchar(4096) const;
+  end-pi;
+  dcl-s messageText varchar(4096);
+  dcl-s contentJson varchar(8192);
+
+  messageText = systemJson;
+  exec sql
+    values json_object('type' value 'text',
+                       'text' value :messageText
+                       returning varchar(8192))
+      into :contentJson;
+  if sqlcode <> 0;
+    return '{"content":[{"type":"text",' +
+      '"text":"Could not format system information."}],' +
+      '"isError":true}';
+  endif;
+  return '{"content":[' + %trim(contentJson) +
+    '],"isError":false}';
 end-proc;
 
 dcl-proc getEnv;

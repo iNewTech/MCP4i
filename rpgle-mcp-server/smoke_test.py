@@ -62,7 +62,14 @@ def main():
     assert status == 202 and not raw, (status, raw)
 
     listed = expect_rpc(args.url, {"jsonrpc": "2.0", "id": "list-1", "method": "tools/list"}, "list-1")
-    assert [tool["name"] for tool in listed["result"]["tools"]] == ["get_system_info"], listed
+    tools = listed["result"]["tools"]
+    assert [tool["name"] for tool in tools] == ["get_system_info"], listed
+    assert tools[0]["description"], tools[0]
+    assert tools[0]["inputSchema"] == {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    }, tools[0]
 
     called = expect_rpc(
         args.url,

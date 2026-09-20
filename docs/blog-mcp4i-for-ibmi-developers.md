@@ -11,7 +11,7 @@ IBM i developer library, program, file ya job inspect kar sakta hai, lekin chat 
 
 ## Why use RPGLE for the MCP server?
 
-MCP lets a server advertise tools with names, descriptions, and input schemas, then lets a client list and call those tools through a defined protocol ([MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)). The IBM i community should be able to study that server-side protocol handling in a familiar language, so the first [MCPHTTP.sqlrpgle program](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle) handles the MCP request itself instead of sitting behind a Python wrapper. IBM HTTP Server for i receives `POST /mcp` and invokes the ILE RPG program as CGI, a pattern IBM documents for RPG programs ([IBM RPG CGI example](https://www.ibm.com/support/pages/ile-rpg-cgi-programming-example)). The program uses IBM CGI APIs to read the request and write the response, while Db2 for i functions parse and generate JSON ([annotated source](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L16)). The HTTP server owns the listening socket, so submitting `CALL MCP4I/MCPHTTP` with `SBMJOB` would not create a working MCP listener.
+MCP lets a server advertise tools with names, descriptions, and input schemas, then lets a client list and call those tools through a defined protocol ([MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)). The IBM i community should be able to study that server-side protocol handling in a familiar language, so the first [MCPHTTP.sqlrpgle program](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle) handles the MCP request itself instead of sitting behind a Python wrapper. IBM HTTP Server for i receives `POST /mcp` and invokes the ILE RPG program as CGI, a pattern IBM documents for RPG programs ([IBM RPG CGI example](https://www.ibm.com/support/pages/ile-rpg-cgi-programming-example)). The program uses IBM CGI APIs to read the request and write the response, while Db2 for i functions parse and generate JSON ([annotated source](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L27)). The HTTP server owns the listening socket, so submitting `CALL MCP4I/MCPHTTP` with `SBMJOB` would not create a working MCP listener.
 
 <details>
 <summary>Hinglish</summary>
@@ -38,7 +38,7 @@ MCP client → model and user
 
 ## What the RPGLE source actually handles
 
-The [request handler](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L91) checks the HTTP method, Origin, content type, and request size before it reads and parses the JSON body. The [MCP dispatcher](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L199) implements `initialize`, `notifications/initialized`, `ping`, `tools/list`, and `tools/call` for the 2025-11-25 request-response subset. During `tools/list`, the program advertises just one tool, `get_system_info`, with an empty input schema ([tool definition](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L205)).
+The [request handler](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L126) checks the HTTP method, Origin, content type, and request size before it reads and parses the JSON body. The [MCP dispatcher](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L247) implements `initialize`, `notifications/initialized`, `ping`, `tools/list`, and `tools/call` for the 2025-11-25 request-response subset. During `tools/list`, the program advertises just one tool, `get_system_info`, with an empty input schema ([tool definition](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L295)).
 
 <details>
 <summary>Hinglish</summary>
@@ -47,7 +47,7 @@ Request handler JSON body padhne aur parse karne se pehle HTTP method, Origin, c
 
 </details>
 
-During `tools/call`, the program accepts only that tool name and runs a fixed read of `SYSIBMADM.ENV_SYS_INFO` rather than SQL supplied by a model ([tool call and SQL](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L213)). The result contains OS and host identity plus a local observation timestamp, and Db2 for i escapes the text before the [CGI response writer](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L299) returns it. This is source code ready for a development-partition trial, not a claim that it has already compiled or passed a live IBM i test.
+During `tools/call`, the program accepts only that tool name and runs a fixed read of `SYSIBMADM.ENV_SYS_INFO` rather than SQL supplied by a model ([tool handler](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L308) and [fixed SQL](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L328)). The result contains OS and host identity plus a local observation timestamp, and Db2 for i escapes the text before the [CGI response writer](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle#L407) returns it. This is source code ready for a development-partition trial, not a claim that it has already compiled or passed a live IBM i test.
 
 <details>
 <summary>Hinglish</summary>
