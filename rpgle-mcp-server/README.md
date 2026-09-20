@@ -77,7 +77,7 @@ ADDJOBQE SBSD(MCP4I/MCPSBS) JOBQ(MCP4I/MCPJOBQ) MAXACT(20) SEQNBR(10)
 ADDRTGE SBSD(MCP4I/MCPSBS) SEQNBR(10) CMPVAL(MCPHTTP) PGM(QSYS/QCMD) CLS(MCP4I/MCPCLS)
 ```
 
-`MCPJOBQ` queues this HTTP instance's jobs; `MCPSBS` runs them; `MCPJOBD` and `MCPCLS` select routing and execution attributes. The HTTP directives in [httpd.conf.example](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example) connect the instance to these objects. IBM specifically requires the custom job queue and an **active** subsystem for HTTP jobs to run outside `QHTTPSVR` ([IBM setup procedure](https://www.ibm.com/support/pages/node/645335)).
+`MCPJOBQ` queues this HTTP instance's jobs; `MCPSBS` runs them; `MCPJOBD` and `MCPCLS` select routing and execution attributes. These are **HTTP server jobs**, not one submitted `MCPHTTP` job. The HTTP directives in [httpd.conf.example](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example) connect the instance to these objects. IBM specifically requires the custom job queue and an **active** subsystem for HTTP jobs to run outside `QHTTPSVR` ([IBM setup procedure](https://www.ibm.com/support/pages/node/645335)). The dedicated subsystem helps isolate and monitor this instance; it is not an MCP protocol requirement.
 
 ## 3. Compile and bind the RPG program
 
@@ -102,7 +102,15 @@ The fixed `SYSIBMADM.ENV_SYS_INFO` view [requires no additional view authority](
 
 ## 4. Create and configure the HTTP instance
 
-In **IBM Web Administration for i**, create a dedicated IBM HTTP Server instance named `MCP4I`. Open its configuration and add the directives in [httpd.conf.example](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example). If the wizard already wrote `Listen` or `ServerName`, edit those lines rather than adding duplicates. Verify that `MCP4I/MCPSBS`, `MCP4I/MCPJOBQ`, `MCP4I/MCPJOBD`, and `MCP4I/MCPCLS` exist first.
+Start the Web Administration instance if it is not already running:
+
+```cl
+STRTCPSVR SERVER(*HTTP) HTTPSVR(*ADMIN)
+```
+
+In **IBM Web Administration for i**, use **Setup → Create HTTP Server** to create a dedicated IBM HTTP Server (Apache) instance named `MCP4I`. Choose a server root and local test port, then open the instance's configuration and add the directives in [httpd.conf.example](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example). If the wizard already wrote `Listen` or `ServerName`, edit those lines rather than adding duplicates. Verify that `MCP4I/MCPSBS`, `MCP4I/MCPJOBQ`, `MCP4I/MCPJOBD`, and `MCP4I/MCPCLS` exist first. IBM documents the [instance wizard](https://www.ibm.com/docs/en/i/7.5?topic=tasks-getting-started) and [ILE CGI URL mapping](https://www.ibm.com/docs/en/i/7.4?topic=programming-setting-up-cgi-programs).
+
+The key `ScriptAlias /mcp /QSYS.LIB/MCP4I.LIB/MCPHTTP.PGM` directive tells Apache which RPG program handles the MCP URL. This program is ordinary ILE CGI, so Nginx is not needed to invoke it; Nginx could later reverse-proxy the HTTP endpoint, but its `fastcgi_pass` expects a separate FastCGI server ([Nginx guide](https://nginx.org/en/docs/beginners_guide.html)).
 
 This example listens only on IBM i loopback port **8088**, permits local CGI requests, and rejects any HTTP `Origin` header in RPG. It deliberately cannot be reached directly from the internet. For external clients, add a managed TLS/authentication reverse proxy after the local test and define a permitted origin policy for your deployment. Do not remove the loopback/access controls just to make an MCP client connect.
 
@@ -110,7 +118,7 @@ The HTTP server converts network UTF-8 JSON to the CGI job CCSID and back using 
 
 ## 5. Start, inspect, and stop
 
-The RPG program is **not** a long-running socket listener. The HTTP instance owns the listener and invokes the RPG CGI program for each request. Start the dedicated subsystem before the HTTP instance:
+The RPG program is **not** a long-running socket listener. The HTTP instance owns the listener. IBM identifies `QZSRHTTP` as a request-handling job and `QZSRCGI` as a CGI job; there may be several CGI jobs. For each matching `/mcp` request, a CGI job invokes `MCPHTTP`, which reads that request and returns its MCP response ([IBM CGI job overview](https://www.ibm.com/support/pages/node/1171114)). Start the dedicated subsystem before the HTTP instance:
 
 ```cl
 STRSBS SBSD(MCP4I/MCPSBS)
@@ -119,13 +127,7 @@ WRKACTJOB SBS(MCPSBS) JOB(MCP4I)
 WRKJOBQ JOBQ(MCP4I/MCPJOBQ)
 ```
 
-If you need to start the HTTP instance from a batch job, submit the **start command** to an already running control queue after `STRSBS` (example only; use your site's approved control queue):
-
-```cl
-SBMJOB CMD(STRTCPSVR SERVER(*HTTP) HTTPSVR(MCP4I)) JOBQ(QGPL/QBATCH)
-```
-
-Do **not** submit `CALL MCP4I/MCPHTTP` with `SBMJOB`: it has no CGI request body or HTTP environment and cannot listen for MCP clients. Also do not submit this start command to `MCPJOBQ`; that queue is for the HTTP instance's workers. The supported start/stop interface is `STRTCPSVR` / `ENDTCPSVR` ([IBM HTTP command reference](https://www.ibm.com/docs/en/i/7.4.0?topic=ssw_ibm_i_74%2Fcl%2Fstrtcpsvr.html)).
+There is no `SBMJOB` step for the RPG program. `SBMJOB CMD(CALL MCP4I/MCPHTTP)` has no CGI request body or HTTP environment and cannot listen for MCP clients. The dedicated job queue is for the HTTP instance's jobs, which `STRTCPSVR` starts. Use `STRTCPSVR` / `ENDTCPSVR` to control the instance ([IBM HTTP command reference](https://www.ibm.com/docs/en/i/7.4.0?topic=ssw_ibm_i_74%2Fcl%2Fstrtcpsvr.html)).
 
 ```cl
 ENDTCPSVR SERVER(*HTTP) HTTPSVR(MCP4I)

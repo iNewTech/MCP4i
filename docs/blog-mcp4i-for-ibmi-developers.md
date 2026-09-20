@@ -112,12 +112,31 @@ Aakhir mein updated program ko IBM i development partition par compile karo aur 
 
 ## How to deploy the first program on IBM i
 
-The full [RPGLE deployment guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md) is the command-by-command reference for copying the source to the IFS, creating the library, granting authority, configuring HTTP, and verifying the endpoint. First, create the `MCP4I` library and the dedicated `MCPJOBQ`, `MCPJOBD`, `MCPCLS`, and `MCPSBS` objects using the guide's setup commands. Next, copy `MCPHTTP.sqlrpgle` to your IFS build directory and compile and bind the one RPGLE program with these commands, adjusting the source path for your system.
+The full [RPGLE deployment guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md) covers source transfer, authority, the HTTP instance, and testing. This sample uses a dedicated `MCP4I` library, `MCPSBS` subsystem, `MCPJOBQ` job queue, `MCPJOBD` job description, and `MCPCLS` class. These objects isolate the **HTTP server jobs**; they do not turn `MCPHTTP` into a permanently running RPG job. Create them once with the commands below, adjusting the pool and job limits for your development partition.
 
 <details>
 <summary>Hinglish</summary>
 
-Puri RPGLE deployment guide source ko IFS mein copy karne, library banane, authority dene, HTTP configure karne aur endpoint verify karne ke liye command-by-command reference hai. Sabse pehle guide ke setup commands se `MCP4I` library aur dedicated `MCPJOBQ`, `MCPJOBD`, `MCPCLS` aur `MCPSBS` objects banao. Phir `MCPHTTP.sqlrpgle` ko apni IFS build directory mein copy karo aur apne system ke source path ko adjust karke in commands se ek RPGLE program compile aur bind karo.
+Puri RPGLE deployment guide source transfer, authority, HTTP instance aur testing cover karti hai. Is sample mein dedicated `MCP4I` library, `MCPSBS` subsystem, `MCPJOBQ` job queue, `MCPJOBD` job description aur `MCPCLS` class use hote hain. Yeh objects **HTTP server jobs** ko alag rakhte hain; `MCPHTTP` ko hamesha chalne wala RPG job nahi banate. Development partition ke hisaab se pool aur job limits adjust karke yeh commands ek baar chalao.
+
+</details>
+
+```cl
+CRTLIB LIB(MCP4I) TEXT('MCP4i RPG HTTP server')
+CRTJOBQ JOBQ(MCP4I/MCPJOBQ) TEXT('MCP HTTP jobs')
+CRTJOBD JOBD(MCP4I/MCPJOBD) JOBQ(MCP4I/MCPJOBQ) USER(QTMHHTTP) RTGDTA(MCPHTTP) JOBMSGQFL(*WRAP)
+CRTCLS CLS(MCP4I/MCPCLS) RUNPTY(25) TEXT('MCP HTTP job class')
+CRTSBSD SBSD(MCP4I/MCPSBS) POOLS((1 256 50 *MB)) MAXJOBS(20) TEXT('MCP HTTP subsystem')
+ADDJOBQE SBSD(MCP4I/MCPSBS) JOBQ(MCP4I/MCPJOBQ) MAXACT(20) SEQNBR(10)
+ADDRTGE SBSD(MCP4I/MCPSBS) SEQNBR(10) CMPVAL(MCPHTTP) PGM(QSYS/QCMD) CLS(MCP4I/MCPCLS)
+```
+
+Copy `MCPHTTP.sqlrpgle` to the IFS build directory, then compile and bind the `*PGM` object in `MCP4I`. Change the source path to match your system; compiling alone does not create a network listener. The [IBM CGI setup guide](https://www.ibm.com/docs/en/i/7.4?topic=programming-setting-up-cgi-programs) confirms that an ILE RPG CGI program needs an HTTP server configuration that maps a URL to the program.
+
+<details>
+<summary>Hinglish</summary>
+
+`MCPHTTP.sqlrpgle` ko IFS build directory mein copy karke `MCP4I` mein `*PGM` object compile aur bind karo. Source path apne system ke mutabik badlo; sirf compile karne se network listener nahi banta. IBM ki CGI setup guide bhi batati hai ki ILE RPG CGI program chalane ke liye HTTP server configuration mein URL ko program se map karna padta hai.
 
 </details>
 
@@ -126,12 +145,31 @@ CRTSQLRPGI OBJ(MCP4I/MCPHTTP) SRCSTMF('/home/builduser/MCP4i/MCPHTTP.sqlrpgle') 
 CRTPGM PGM(MCP4I/MCPHTTP) MODULE(MCP4I/MCPHTTP) BNDSRVPGM(QHTTPSVR/QZHBCGI)
 ```
 
-Add the [HTTP configuration directives](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example) to a dedicated `MCP4I` HTTP instance so `/mcp` maps to the program and the instance uses the new job queue and subsystem. Start the subsystem before the HTTP instance, because IBM requires an active subsystem for jobs routed to a custom HTTP job queue ([IBM procedure](https://www.ibm.com/support/pages/node/645335)). If your operations process uses `SBMJOB`, submit the `STRTCPSVR` start command to an already running control queue rather than submitting the RPG CGI program itself ([batch-start explanation](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md#5-start-inspect-and-stop)).
+Now create the **IBM HTTP Server for i (Apache)** instance named `MCP4I` in IBM Web Administration for i: start `*ADMIN` if needed with `STRTCPSVR SERVER(*HTTP) HTTPSVR(*ADMIN)`, open **Setup → Create HTTP Server**, choose the instance name and server root, and set a local test port. IBM documents this [instance wizard](https://www.ibm.com/docs/en/i/7.5?topic=tasks-getting-started). In its configuration, add the repository's full [httpd.conf.example](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example), editing any wizard-generated `Listen` or `ServerName` lines instead of duplicating them. The key `ScriptAlias` line maps `POST /mcp` to `MCP4I/MCPHTTP`; the `HTTPStartJob*` and `HTTPSubsystemDesc` directives send the instance's server jobs to the dedicated queue and subsystem ([IBM subsystem procedure](https://www.ibm.com/support/pages/node/645335)).
 
 <details>
 <summary>Hinglish</summary>
 
-Dedicated `MCP4I` HTTP instance mein HTTP configuration directives add karo, taaki `/mcp` program se map ho aur instance nayi job queue aur subsystem use kare. HTTP instance se pehle subsystem start karo, kyunki custom HTTP job queue mein route hone wale jobs ke liye IBM active subsystem require karta hai. Agar operations process mein `SBMJOB` use hota hai, to RPG CGI program ko submit karne ke bajay `STRTCPSVR` start command ko pehle se running control queue mein submit karo.
+Ab IBM Web Administration for i mein `MCP4I` naam ka **IBM HTTP Server for i (Apache)** instance banao: zarurat ho to `STRTCPSVR SERVER(*HTTP) HTTPSVR(*ADMIN)` se `*ADMIN` start karo, **Setup → Create HTTP Server** kholo, instance name aur server root do, aur local test port set karo. Configuration mein repository wala poora `httpd.conf.example` add karo; wizard ne `Listen` ya `ServerName` pehle likha ho to duplicate karne ke bajay existing lines edit karo. `ScriptAlias` se `POST /mcp` request `MCP4I/MCPHTTP` tak pahunchti hai, aur `HTTPStartJob*` aur `HTTPSubsystemDesc` directives server jobs ko dedicated queue aur subsystem mein bhejte hain.
+
+</details>
+
+```apache
+# Excerpt; use the linked file for the complete configuration and access rules.
+Listen 127.0.0.1:8088
+HTTPStartJobQueue MCP4I/MCPJOBQ
+HTTPStartJobDesc MCP4I/MCPJOBD
+HTTPRoutingData MCPHTTP
+HTTPSubsystemDesc MCP4I/MCPSBS
+ScriptAlias /mcp /QSYS.LIB/MCP4I.LIB/MCPHTTP.PGM
+```
+
+Start the subsystem and then the HTTP instance. The HTTP listener accepts requests, its CGI jobs run the RPG program for matching `/mcp` requests, and the program reads one CGI request and returns one MCP response. IBM identifies `QZSRHTTP` as a request-handling job and `QZSRCGI` as a CGI job; there may be multiple CGI jobs, so **one submitted RPG job is not responsible for every request** ([IBM CGI job overview](https://www.ibm.com/support/pages/node/1171114)). `SBMJOB CMD(CALL MCP4I/MCPHTTP)` has no role here: without an HTTP CGI request, the program has no request body or environment to process. The `MCPSBS`/`MCPJOBQ` objects are useful for server-job isolation and monitoring, but a dedicated subsystem is not required by MCP itself.
+
+<details>
+<summary>Hinglish</summary>
+
+Pehle subsystem aur phir HTTP instance start karo. HTTP listener requests leta hai; uske CGI jobs matching `/mcp` requests par RPG program chalate hain, aur program ek CGI request padhkar ek MCP response return karta hai. IBM ke hisaab se `QZSRHTTP` request-handling job aur `QZSRCGI` CGI job hai; kai CGI jobs ho sakte hain, isliye **ek submitted RPG job saari requests handle nahi karta**. Yahan `SBMJOB CMD(CALL MCP4I/MCPHTTP)` ka koi kaam nahi hai: HTTP CGI request ke bina program ko request body aur environment milenge hi nahi. `MCPSBS` aur `MCPJOBQ` server jobs ko isolate aur monitor karne ke liye useful hain, lekin MCP protocol ke liye dedicated subsystem zaroori nahi hai.
 
 </details>
 
@@ -139,6 +177,15 @@ Dedicated `MCP4I` HTTP instance mein HTTP configuration directives add karo, taa
 STRSBS SBSD(MCP4I/MCPSBS)
 STRTCPSVR SERVER(*HTTP) HTTPSVR(MCP4I)
 ```
+
+Nginx is not needed in this first deployment: IBM's Apache-based server already knows how to invoke an ILE RPG CGI program. Nginx can later sit in front as a reverse proxy, while IBM HTTP Server still performs the RPG CGI call; its documented `fastcgi_pass` expects a FastCGI server, which this ordinary ILE CGI program is not ([Nginx FastCGI guide](https://nginx.org/en/docs/beginners_guide.html)).
+
+<details>
+<summary>Hinglish</summary>
+
+Is pehle deployment mein Nginx ki zarurat nahi hai: IBM ka Apache-based server ILE RPG CGI program ko khud invoke kar sakta hai. Baad mein Nginx ko reverse proxy ke roop mein aage rakh sakte ho, lekin RPG CGI call IBM HTTP Server hi karega; Nginx ka `fastcgi_pass` FastCGI server expect karta hai, aur yeh normal ILE CGI program FastCGI server nahi hai.
+
+</details>
 
 The sample endpoint listens only on IBM i loopback, so use the guide's SSH tunnel or run the [smoke test](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/smoke_test.py) from a machine that can reach it. The test covers initialization, tool discovery, one live `get_system_info` call, and rejection of several invalid requests; keep actual host names and system output out of public logs.
 
