@@ -1,9 +1,8 @@
 **free
-// One ILE RPG program is both the MCP protocol handler and the IBM i reader.
-// IBM HTTP Server invokes it as CGI for each POST /mcp request.
-// Read this file top to bottom: CGI input -> JSON-RPC dispatch -> CGI output.
-// Tool metadata and tool execution live in separate named subprocedures.
-// Only the fixed get_system_info tool touches IBM i data in this lesson.
+// Entry module of one ILE RPG program bound with separate tool modules.
+// IBM HTTP Server invokes this program as CGI for each POST /mcp request.
+// This file owns CGI, JSON-RPC, tool registration, and tool routing only.
+// Each tool module owns its metadata, fixed IBM i read, and MCP result.
 ctl-opt dftactgrp(*no) actgrp(*caller) option(*srcstmt:*nodebugio);
 
 // All SQL is local and read-only. The same rule is set in the build command.
@@ -14,6 +13,7 @@ exec sql set option commit = *none, naming = *sql;
 dcl-c LF x'15';
 dcl-c MAX_BODY 16384;
 dcl-c SYS_INFO_TOOL 'get_system_info';
+dcl-c LIB_LIST_TOOL 'get_library_list';
 
 // IBM's QUSEC API error structure. Supplying 16 bytes returns error details
 // instead of sending an unhandled escape message into the CGI job.
@@ -49,8 +49,7 @@ dcl-pr QtmhWrStout extproc('QtmhWrStout');
   errorCode likeds(apiError);
 end-pr;
 
-// These prototypes are a map of the lesson. The first four procedures handle
-// transport and MCP routing; tool registration/execution stays below them.
+// These procedures handle the transport and MCP request flow.
 dcl-pr handleRequest;
 end-pr;
 
@@ -63,8 +62,7 @@ end-pr;
 dcl-pr dispatchRpcRequest;
 end-pr;
 
-// TOOL REGISTRY: listTools joins tool definitions for tools/list.
-// TOOL DEFINITION: getSysInfoTool returns metadata, never reads IBM i data.
+// TOOL REGISTRY: the two functions below stay in this entry module.
 dcl-pr listTools varchar(8192);
 end-pr;
 
@@ -72,18 +70,18 @@ dcl-pr callRegisteredTool varchar(8192);
   requestedTool varchar(64) const;
 end-pr;
 
+// Exported procedures implemented in the separately bound tool modules.
+// A new tool adds two prototypes here, one listTools entry, and one WHEN.
 dcl-pr getSysInfoTool varchar(512);
 end-pr;
 
-// TOOL EXECUTION: runSysInfoTool coordinates the fixed read and MCP result.
 dcl-pr runSysInfoTool varchar(8192);
 end-pr;
 
-dcl-pr readSysInfo varchar(4096);
+dcl-pr getLibListTool varchar(512);
 end-pr;
 
-dcl-pr asTextToolResult varchar(8192);
-  systemJson varchar(4096) const;
+dcl-pr runLibListTool varchar(8192);
 end-pr;
 
 dcl-pr getEnv varchar(1024);
@@ -104,7 +102,7 @@ end-pr;
 
 // Only values shared across request stages are global. Each CGI invocation
 // handles one request; subprocedure-only buffers are declared locally below.
-// An arbitrary SQL runner or caller-selected IBM i system is not present.
+// Tool modules receive no arbitrary SQL or caller-selected IBM i system.
 dcl-s requestJson varchar(MAX_BODY);
 dcl-s methodName varchar(64);
 dcl-s rpcVersion varchar(16);
@@ -138,7 +136,7 @@ dcl-proc readHttpRequest;
   dcl-s rawInput char(MAX_BODY);
 
   // Streamable HTTP sends MCP messages by POST. GET would require a server
-  // event stream, which this first one-tool version does not implement.
+  // event stream, which this request-response sample does not implement.
   httpMethod = getEnv('REQUEST_METHOD');
   if httpMethod <> 'POST';
     sendHttp('405 Method Not Allowed': '': 'Allow: POST');
@@ -257,7 +255,7 @@ dcl-proc dispatchRpcRequest;
   when methodName = 'initialize';
     resultJson = '{"protocolVersion":"2025-11-25",' +
       '"capabilities":{"tools":{}},' +
-      '"serverInfo":{"name":"rpgle-mcp-server","version":"0.1.0"}}';
+      '"serverInfo":{"name":"rpgle-mcp-server","version":"0.2.0"}}';
   when methodName = 'ping';
     resultJson = '{}';
   when methodName = 'tools/list';
@@ -288,23 +286,22 @@ dcl-proc listTools;
   dcl-pi *n varchar(8192);
   end-pi;
   dcl-s toolList varchar(512) dim(10);
-  dcl-s toolCount int(10) inz(1);
+  dcl-s toolCount int(10) inz(2);
   dcl-s toolIndex int(10);
   dcl-s listJson varchar(8192) inz('{"tools":[');
   dcl-s sysInfoTool varchar(512);
-  // When getUserInfoTool() exists, declare this above the executable lines:
-  // dcl-s userInfoTool varchar(512);
+  dcl-s libListTool varchar(512);
 
-  // Tool 1: the only real tool in this lesson.
+  // Each metadata procedure lives beside its execution procedure in a
+  // bound tool module. Nothing below reads IBM i data while listing tools.
   sysInfoTool = getSysInfoTool();
   toolList(1) = sysInfoTool;
+  libListTool = getLibListTool();
+  toolList(2) = libListTool;
 
-  // Example for a FUTURE tool; these lines stay commented until it exists.
-  // Write getUserInfoTool() for metadata, runUserInfoTool() for execution,
-  // and add its WHEN in callRegisteredTool() below before enabling these:
-  // userInfoTool = getUserInfoTool();
-  // toolList(2) = userInfoTool;
-  // toolCount = 2;
+  // To add tool 3: write its module, bind it with CRTPGM, declare its two
+  // exported procedures above, assign toolList(3), set toolCount = 3,
+  // and add the matching WHEN in callRegisteredTool below.
 
   // Build a JSON array from registered entries; do not add commas above.
   for toolIndex = 1 to toolCount;
@@ -328,89 +325,10 @@ dcl-proc callRegisteredTool;
   select;
   when requestedTool = SYS_INFO_TOOL;
     toolResult = runSysInfoTool();
-  // Future example: match the "name" returned by getUserInfoTool().
-  // when requestedTool = 'get_user_info';
-  //   toolResult = runUserInfoTool();
+  when requestedTool = LIB_LIST_TOOL;
+    toolResult = runLibListTool();
   endsl;
   return toolResult;
-end-proc;
-
-// TOOL DEFINITION: only the public MCP name, description and input schema.
-// No Db2 query, CGI operation, or tool execution belongs in this procedure.
-dcl-proc getSysInfoTool;
-  dcl-pi *n varchar(512);
-  end-pi;
-
-  return '{"name":"' + SYS_INFO_TOOL + '",' +
-    '"description":"Read IBM i OS and host identity from ' +
-    'SYSIBMADM.ENV_SYS_INFO.",' +
-    '"inputSchema":{"type":"object","properties":{},' +
-    '"additionalProperties":false}}';
-end-proc;
-
-// TOOL HANDLER: translate the fixed read into a successful or failed MCP
-// result. The caller cannot pass SQL, an object name, or another partition.
-dcl-proc runSysInfoTool;
-  dcl-pi *n varchar(8192);
-  end-pi;
-  dcl-s systemJson varchar(4096);
-
-  systemJson = readSysInfo();
-  if systemJson = '';
-    // A tool failure is an MCP result with isError=true. Never return the
-    // database error text or internal host details to the client.
-    return '{"content":[{"type":"text",' +
-      '"text":"System information is unavailable."}],' +
-      '"isError":true}';
-  endif;
-  return asTextToolResult(systemJson);
-end-proc;
-
-// IBM i READ: this is the only procedure that queries system information.
-// The SELECT is fixed in source and describes the local CGI partition.
-dcl-proc readSysInfo;
-  dcl-pi *n varchar(4096);
-  end-pi;
-  dcl-s systemJson varchar(4096) inz('');
-
-  exec sql
-    select json_object(
-             'os_name' value os_name,
-             'os_version' value os_version,
-             'os_release' value os_release,
-             'host_name' value host_name,
-             'observed_at_local' value char(current_timestamp)
-             returning varchar(4096))
-      into :systemJson
-      from sysibmadm.env_sys_info;
-  if sqlcode <> 0;
-    return '';
-  endif;
-  return %trim(systemJson);
-end-proc;
-
-// MCP RESULT FORMATTER: JSON_OBJECT escapes the JSON document as one text
-// value, so quotation marks in IBM i data cannot corrupt the MCP envelope.
-dcl-proc asTextToolResult;
-  dcl-pi *n varchar(8192);
-    systemJson varchar(4096) const;
-  end-pi;
-  dcl-s messageText varchar(4096);
-  dcl-s contentJson varchar(8192);
-
-  messageText = systemJson;
-  exec sql
-    values json_object('type' value 'text',
-                       'text' value :messageText
-                       returning varchar(8192))
-      into :contentJson;
-  if sqlcode <> 0;
-    return '{"content":[{"type":"text",' +
-      '"text":"Could not format system information."}],' +
-      '"isError":true}';
-  endif;
-  return '{"content":[' + %trim(contentJson) +
-    '],"isError":false}';
 end-proc;
 
 dcl-proc getEnv;

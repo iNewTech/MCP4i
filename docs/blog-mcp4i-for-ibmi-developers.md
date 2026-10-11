@@ -1,5 +1,8 @@
 # MCP4i: Learning MCP by Building a Server in RPGLE
 
+> **Project update:** This article describes the initial single-tool version. The current [RPGLE deployment guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md) uses separate bound modules and advertises `get_system_info` and `get_library_list`. Follow that guide for current source and build steps.
+
+
 An IBM i developer may know how to inspect a library, program, file, or job, but a chat model cannot see the current state of that partition on its own. I started [MCP4i](https://github.com/iNewTech/MCP4i) to learn the Model Context Protocol (MCP) while building a controlled way for an AI client to ask IBM i for read-only information. This article concentrates on the single-program RPGLE server; the other folders provide interactive MCP practice with local Ollama and fictional documents.
 
 <details>

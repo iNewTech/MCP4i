@@ -6,7 +6,7 @@ The project connects AI concepts to familiar IBM i work: inspecting libraries an
 
 New to the project? Read the [MCP4i article for IBM i developers](docs/blog-mcp4i-for-ibmi-developers.md) for the motivation, repository map, and ways to try it.
 
-**Current stage:** Lessons 1–10, Python and TypeScript CLI starters, and a completed Python document demo are available. The CLIs use local Ollama. A one-tool RPGLE MCP server is now in source form; IBM i compilation and a live connection remain unverified.
+**Current stage:** Lessons 1–10, Python and TypeScript CLI starters, and a completed Python document demo are available. The CLIs use local Ollama. A two-tool RPGLE MCP server with separately bound tool modules is now in source form; IBM i compilation and a live connection remain unverified.
 
 ## Start learning
 
@@ -37,7 +37,7 @@ For the [TypeScript CLI starter](cli_project_ts/README.md), use Node.js 22.19+ a
 
 ## Build the RPGLE MCP server
 
-The [RPGLE MCP server guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md) explains the IBM i library, compile and bind commands, dedicated job queue and subsystem, HTTP instance, start/stop commands, and live smoke test. It implements one read-only `get_system_info` tool directly in [MCPHTTP.sqlrpgle](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle). Its [HTTP configuration](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example) and [smoke test](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/smoke_test.py) are separate files. This slice has not yet been compiled or tested on a real IBM i partition.
+The [RPGLE MCP server guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md) explains the IBM i library, compile and bind commands, dedicated job queue and subsystem, HTTP instance, start/stop commands, and live smoke test. [MCPHTTP.sqlrpgle](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle) handles CGI and registers two read-only tools, each implemented in its own bound RPG module: `get_system_info` and `get_library_list`. Its [HTTP configuration](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example) and [smoke test](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/smoke_test.py) are separate files. This slice has not yet been compiled or tested on a real IBM i partition.
 
 ## How this bootcamp works
 
@@ -109,7 +109,10 @@ MCP4i/
 │   └── README.md (TypeScript counterpart to the starter)
 └── rpgle-mcp-server/
     ├── README.md (deploy, compile, start, and verify)
-    ├── MCPHTTP.sqlrpgle (one-program MCP server)
+    ├── MCPHTTP.sqlrpgle (CGI entry and tool registry)
+    ├── SYSINFO.sqlrpgle (system-information tool module)
+    ├── LIBLIST.sqlrpgle (library-list tool module)
+    ├── MCPJSON.sqlrpgle (shared result formatter module)
     ├── httpd.conf.example (dedicated HTTP instance)
     └── smoke_test.py (live protocol test client)
 ```

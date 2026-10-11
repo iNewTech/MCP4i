@@ -6,7 +6,7 @@
 
 Let an authorized user ask questions about IBM i and receive bounded, traceable observations. Phase 1 covers system identity, library context, object and file metadata, recorded dependencies, job inspection, approved SQL reads, source reading, and logs.
 
-**This is a design roadmap.** Source for one `get_system_info` tool now exists in the [RPGLE MCP server](../rpgle-mcp-server/README.md), but it has not been compiled or verified against a target partition. The remaining tools are designs. A tool becomes available only after its backend, permissions, and limits are verified.
+**This is a design roadmap.** Source for `get_system_info` and `get_library_list` now exists as separately bound modules in the [RPGLE MCP server](../rpgle-mcp-server/README.md), but neither has been compiled or verified against a target partition. The remaining tools are designs. A tool becomes available only after its backend, permissions, and limits are verified.
 
 Use descriptive snake_case names. Expose the user's information need, such as `get_program_references`, instead of an arbitrary command runner. References to familiar IBM i commands describe the information users want; they are not instructions to execute those commands behind a tool.
 
