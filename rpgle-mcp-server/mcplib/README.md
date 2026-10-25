@@ -20,7 +20,7 @@ This milestone supplies source, DDS administration screens, two sample read-only
 
 ## Build on IBM i from the IFS
 
-Put this entire `mcplib` directory in the IBM i IFS, for example `/home/builduser/mcplib`. Use an account that can create objects in `MCPLIB` and compile RPG, CL, DDS, and SQL. In a PASE shell:
+Put this entire `mcplib` directory in the IBM i IFS, for example `/home/builduser/mcplib`. Use an account that can create objects in `MCPLIB` and compile RPG, CL, DDS, and SQL. The build binds `MCPHTTP` to `QHTTPSVR/QZHBCGI`, so that IBM HTTP Server service program must be installed before compiling, even though the HTTP instance is provisioned later. In a PASE shell:
 
 ```sh
 cd /home/builduser/mcplib
@@ -54,13 +54,13 @@ Use the `SCHEMA` call only for the first install; use `APP` for later code rebui
 
 ## First administration path
 
-After the build, put `MCPLIB` on the interactive job's library list and run `CRTMCPSRV SERVER(DEMO)` to enter a display name, port, capability, and settings on the 5250 screen. This first screen accepts up to 128 characters for the saved library list and tool description. `ADDMCPTOOL SERVER(DEMO)` opens the tool screen, where you enter the public name, description, handler, and arguments. `TOOL('get_system_info')` is optional and prefills the name; enter `MCPLIB` and `MCSYSINF` as the reviewed handler library and program. Add `get_library_list` with `MCLIBLST` the same way. New servers and tools begin in draft. `EDTMCPTOOL SERVER(DEMO) TOOL('get_system_info')` requires the existing name and can publish a reviewed READ handler. `RMVMCPTOOL` also requires the existing name and retires a handler without deleting its row.
+Use a 5250 session that supports 27×132 display size (`*DS4`). After the build, put `MCPLIB` on the interactive job's library list and run `CRTMCPSRV SERVER(DEMO)` to enter a display name, port, capability, and settings on the server screen. The server screen accepts up to 128 characters for the saved library list. `ADDMCPTOOL SERVER(DEMO)` opens the tool screen, where you enter the public name, description, handler, and arguments; its description field accepts up to 128 characters. `TOOL('get_system_info')` is optional and prefills the name; enter `MCPLIB` and `MCSYSINF` as the reviewed handler library and program. Add `get_library_list` with `MCLIBLST` the same way. Leave all argument-name fields blank for these two sample handlers; they reject nonempty arguments. New servers and tools begin in draft. `EDTMCPTOOL SERVER(DEMO) TOOL('get_system_info')` requires the existing name and can publish a reviewed READ handler. `RMVMCPTOOL` also requires the existing name and retires a handler without deleting its row.
 
 The server capability (`R`, `W`, or `D`) is stored as a policy ceiling; this version only activates `R` tools. A handler program must implement the [fixed ABI](copy/MCPABI.rpgleinc). Registering an existing program with a different signature requires a small adapter `*PGM`. Review the handler's IBM i authority and behavior before publication: metadata alone does not make code read-only. To change an active handler or its argument schema, save the tool as draft, review it, and publish it again with `EDTMCPTOOL`.
 
 The CGI advertises `get_system_info` and `get_library_list` through `tools/list` after they are published. Long tool lists use `nextCursor`; the client sends that value as `params.cursor` to read the next page. Initialization negotiates the supported `2025-03-26` or `2025-11-25` MCP version. The saved library-list and timeout fields are catalog settings for the next infrastructure milestone; this CGI does not yet apply them to handler jobs.
 
-`STRMCPSRV` requires a separately provisioned IBM HTTP Server instance and reports that it is missing until that deployment step is done. The eventual HTTP worker invokes `MCPHTTP` as CGI for each request; no dedicated `SBMJOB`, job queue, or subsystem is needed for the CGI program itself. The future Apache configuration must convert the RPG program's EBCDIC output to UTF-8 on the network, using IBM HTTP Server's `CGIConvMode EBCDIC` and `DefaultNetCCSID 1208` settings.
+`STRMCPSRV` requires a separately provisioned IBM HTTP Server instance and reports that it is missing until that deployment step is done. After provisioning the instance named `DEMO` with the saved port, run `CHGMCPSRV SERVER(DEMO)` and set its state to `A` (active); only then run `STRMCPSRV SERVER(DEMO)`. The commands do not create or reconfigure the HTTP instance. Its worker invokes `MCPHTTP` as CGI for each request; no dedicated `SBMJOB`, job queue, or subsystem is needed for the CGI program itself. The future Apache configuration must convert the RPG program's EBCDIC output to UTF-8 on the network, using IBM HTTP Server's `CGIConvMode EBCDIC` and `DefaultNetCCSID 1208` settings.
 
 ## IBM references
 
