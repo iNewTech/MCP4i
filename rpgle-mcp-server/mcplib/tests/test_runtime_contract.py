@@ -1,0 +1,63 @@
+"""Static contract checks until an IBM i partition can compile the RPG source.
+
+These checks catch accidental loss of the server boundary or handler ABI.
+They are not a substitute for compiler output or the live HTTP smoke test.
+"""
+
+from pathlib import Path
+import re
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+RPG = ROOT / "rpg"
+
+
+class RuntimeContract(unittest.TestCase):
+    def test_cgi_resolves_trusted_server_before_tool_dispatch(self):
+        source = (RPG / "MCPHTTP.sqlrpgle").read_text()
+        self.assertIn("getEnv('MCP_SERVER_ID')", source)
+        self.assertIn("resolveServer", source)
+        self.assertIn("listRegisteredTools", source)
+        self.assertIn("callRegisteredTool", source)
+        self.assertNotIn("toolList(1) =", source)
+        self.assertNotIn("when requestedTool =", source)
+
+    def test_registry_never_uses_client_text_as_program_or_table_name(self):
+        source = (RPG / "MCPREG.sqlrpgle").read_text()
+        self.assertIn("MCPLIB.MCPCAT", source)
+        self.assertIn("TOOLFILE", source)
+        self.assertIn("STATE = 'A'", source)
+        self.assertIn("TOOL_LVL = ''R''", source)
+        self.assertIn("extpgm(targetprogram)", source.lower())
+        self.assertRegex(source, r"(?i)requestedTool\s+varchar\(64\)\s+const")
+
+    def test_handler_programs_use_fixed_four_argument_abi(self):
+        for name in ("MCSYSINF.sqlrpgle", "MCLIBLST.sqlrpgle"):
+            with self.subTest(name=name):
+                source = (RPG / name).read_text()
+                self.assertRegex(source, r"(?i)argsJson\s+char\(8192\)")
+                self.assertRegex(source, r"(?i)resultJson\s+char\(8192\)")
+                self.assertRegex(source, r"(?i)resultLen\s+int\(10\)")
+                self.assertRegex(source, r"(?i)statusCode\s+int\(10\)")
+
+    def test_registry_checks_handler_length_and_json(self):
+        source = (RPG / "MCPREG.sqlrpgle").read_text()
+        self.assertRegex(source, r"(?i)resultLen\s*<\s*1")
+        self.assertRegex(source, r"(?i)resultLen\s*>\s*4096")
+        self.assertRegex(source, r"(?i)is json object with unique keys")
+
+    def test_argument_extraction_does_not_turn_errors_into_empty_object(self):
+        source = (RPG / "MCPHTTP.sqlrpgle").read_text()
+        self.assertRegex(
+            source,
+            r"(?is)json_query\(:requestJson, '\$\.params\.arguments'.*?error on error\)",
+        )
+
+    def test_text_result_reserves_room_for_mcp_envelope(self):
+        source = (RPG / "MCPJSON.sqlrpgle").read_text()
+        self.assertIn("returning varchar(8100)", source.lower())
+
+
+if __name__ == "__main__":
+    unittest.main()
