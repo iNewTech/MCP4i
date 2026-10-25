@@ -1,7 +1,6 @@
 **free
-// Common CGI entry module. CRTMCPSRV copies the bound program to each
-// server's short IBM i system name; an Apache instance invokes that copy.
-// The trusted MCP_SERVER_ID environment variable selects its registry.
+// Common CGI entry module. Each Apache instance invokes MCPHTTP and sets
+// MCP_SERVER_ID to select exactly one server's registry.
 // This file handles HTTP and JSON-RPC, never a tool-specific SQL query.
 ctl-opt dftactgrp(*no) actgrp(*caller) option(*srcstmt:*nodebugio);
 
@@ -71,6 +70,7 @@ end-pr;
 
 dcl-pr listRegisteredTools varchar(8192);
   toolTable char(10) const;
+  requestedCursor varchar(64) const;
 end-pr;
 
 dcl-pr callRegisteredTool varchar(8192);
@@ -98,16 +98,20 @@ end-pr;
 // Only values shared across request stages are global. Each CGI invocation
 // handles one request; subprocedure-only buffers are declared locally below.
 // Tool modules receive no arbitrary SQL or caller-selected IBM i system.
-dcl-s requestJson varchar(MAX_BODY);
+// Embedded SQL needs a literal host-variable length at precompile time.
+dcl-s requestJson varchar(16384);
 dcl-s methodName varchar(64);
 dcl-s rpcVersion varchar(16);
+dcl-s clientVersion varchar(16);
 dcl-s toolName varchar(64);
+dcl-s listCursor varchar(64);
 dcl-s idRaw varchar(510);
 dcl-s argsJson varchar(8192);
 dcl-s serverId char(10);
 dcl-s displayName varchar(64);
 dcl-s toolTable char(10);
 dcl-s maxLevel char(1);
+dcl-s isNotification ind inz(*off);
 
 // CGI starts here once per HTTP request. There is no forever loop or SBMJOB.
 handleRequest();
@@ -131,6 +135,7 @@ dcl-proc readHttpRequest;
   dcl-s lengthText varchar(1024);
   dcl-s httpMethod varchar(1024);
   dcl-s contentType varchar(1024);
+  dcl-s mcpVersion varchar(1024);
   dcl-s contentLength int(10);
   dcl-s bytesRead int(10);
   dcl-s rawInput char(MAX_BODY);
@@ -147,6 +152,15 @@ dcl-proc readHttpRequest;
   // sample listener is loopback-only; remote deployment needs its own policy.
   if getEnv('HTTP_ORIGIN') <> '';
     sendHttp('403 Forbidden': '': '');
+    return *off;
+  endif;
+
+  // This CGI implements the request/response subset shared by these two
+  // protocol versions. Initialization may arrive without this header.
+  mcpVersion = getEnv('HTTP_MCP_PROTOCOL_VERSION');
+  if mcpVersion <> '' and mcpVersion <> '2025-11-25' and
+     mcpVersion <> '2025-03-26';
+    sendHttp('400 Bad Request': '': '');
     return *off;
   endif;
 
@@ -191,6 +205,7 @@ dcl-proc parseRpcRequest;
   end-pi;
   dcl-s validJson int(10);
   dcl-s idWrapped varchar(512);
+  dcl-s hasId int(10);
 
   // Db2 for i parses JSON; no substring matching of method or tool names.
   // The unique-key check avoids accepting ambiguous JSON such as two methods.
@@ -209,15 +224,21 @@ dcl-proc parseRpcRequest;
   exec sql
     select coalesce(json_value(:requestJson, '$.jsonrpc'
              returning varchar(16)), ''),
+           coalesce(json_value(:requestJson, '$.params.protocolVersion'
+             returning varchar(16)), ''),
            coalesce(json_value(:requestJson, '$.method'
              returning varchar(64)), ''),
            coalesce(json_value(:requestJson, '$.params.name'
              returning varchar(64)), ''),
+           coalesce(json_value(:requestJson, '$.params.cursor'
+             returning varchar(64) null on empty error on error), ''),
            coalesce(json_query(:requestJson, '$.params.arguments'
              returning varchar(8192) null on empty error on error), '{}'),
            coalesce(json_query(:requestJson, '$.id'
-             returning varchar(512) with unconditional array wrapper), '[]')
-      into :rpcVersion, :methodName, :toolName, :argsJson, :idWrapped
+             returning varchar(512) with unconditional array wrapper), '[]'),
+           case when json_exists(:requestJson, '$.id') then 1 else 0 end
+      into :rpcVersion, :clientVersion, :methodName, :toolName, :listCursor,
+           :argsJson, :idWrapped, :hasId
       from sysibm.sysdummy1;
   if sqlcode <> 0;
     sendHttp('200 OK': rpcError('null': -32600: 'Invalid Request'): '');
@@ -231,17 +252,23 @@ dcl-proc parseRpcRequest;
   if %len(idWrapped) > 2;
     idRaw = %subst(idWrapped: 2: %len(idWrapped) - 2);
   endif;
-  if idRaw = 'null' or
-     %check('"-0123456789': %subst(idRaw: 1: 1)) <> 0;
-    if methodName = 'notifications/initialized';
-      sendHttp('202 Accepted': '': '');
-    else;
-      sendHttp('200 OK': rpcError('null': -32600: 'Invalid Request'): '');
-    endif;
+  if rpcVersion <> '2.0';
+    sendHttp('200 OK': rpcError('null': -32600: 'Invalid Request'): '');
     return *off;
   endif;
-  if rpcVersion <> '2.0';
-    sendHttp('200 OK': rpcError(idRaw: -32600: 'Invalid Request'): '');
+  if hasId = 0;
+    if methodName = 'notifications/initialized';
+      isNotification = *on;
+      return *on;
+    endif;
+    // We do not implement other client notifications. Streamable HTTP
+    // requires an HTTP error when a notification cannot be accepted.
+    sendHttp('400 Bad Request': '': '');
+    return *off;
+  endif;
+  if idRaw = 'null' or
+     %check('"-0123456789': %subst(idRaw: 1: 1)) <> 0;
+    sendHttp('200 OK': rpcError('null': -32600: 'Invalid Request'): '');
     return *off;
   endif;
 
@@ -251,6 +278,7 @@ end-proc;
 dcl-proc dispatchRpcRequest;
   dcl-s resultJson varchar(16384);
   dcl-s envServer varchar(1024);
+  dcl-s negotiatedVersion varchar(16);
 
   // SetEnv belongs in the server's Apache configuration. Do not use a
   // request header, query parameter, or tool argument to select a server.
@@ -270,18 +298,34 @@ dcl-proc dispatchRpcRequest;
     return;
   endif;
 
+  if isNotification;
+    sendHttp('202 Accepted': '': '');
+    return;
+  endif;
+
   // MCP lifecycle first: initialize announces protocol and tools capability.
   // The client then sends notifications/initialized (handled above with 202).
   select;
   when methodName = 'initialize';
-    resultJson = '{"protocolVersion":"2025-11-25",' +
+    if clientVersion = '';
+      sendHttp('200 OK': rpcError(idRaw: -32602:
+               'Missing protocol version'): '');
+      return;
+    endif;
+    // Reply with the requested version when supported. Otherwise offer the
+    // latest version we implement and let the client decide whether to stay.
+    negotiatedVersion = '2025-11-25';
+    if clientVersion = '2025-03-26';
+      negotiatedVersion = clientVersion;
+    endif;
+    resultJson = '{"protocolVersion":"' + negotiatedVersion + '",' +
       '"capabilities":{"tools":{}},' +
       '"serverInfo":{"name":"' + %trim(serverId) +
       '","version":"0.3.0"}}';
   when methodName = 'ping';
     resultJson = '{}';
   when methodName = 'tools/list';
-    resultJson = listRegisteredTools(toolTable);
+    resultJson = listRegisteredTools(toolTable: listCursor);
     if resultJson = '';
       sendHttp('200 OK': rpcError(idRaw: -32000:
                'Tool registry unavailable'): '');
@@ -352,7 +396,7 @@ dcl-proc sendHttp;
   // CGI needs a blank line between headers and body. The HTTP server then
   // converts the job's text to the network CCSID selected in its config.
   header = 'Status: ' + status + LF +
-           'Content-Type: application/json; charset=utf-8' + LF +
+           'Content-Type: application/json' + LF +
            'Cache-Control: no-store' + LF;
   if extraHeader <> '';
     header += extraHeader + LF;

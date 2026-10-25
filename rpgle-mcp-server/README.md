@@ -1,5 +1,7 @@
 # RPGLE MCP server: one program, separate tool modules
 
+Building the configurable multi-server application? Use the [MCPLIB application guide](mcplib/README.md). This page documents the original single-server tutorial.
+
 This folder is the first **MCP server written in ILE RPG** in MCP4i. It is not a Python or TypeScript MCP server calling an RPG program. IBM HTTP Server for i receives `POST /mcp`, invokes the RPG program as CGI, and the RPG program parses MCP JSON-RPC, lists its tools, reads Db2 for i, and writes the MCP response.
 
 **Status:** source and deployment recipe are ready for an IBM i development partition. This repository has not compiled or run the program on a partition yet. The live smoke test is the acceptance gate; do not treat this sample as production-verified.

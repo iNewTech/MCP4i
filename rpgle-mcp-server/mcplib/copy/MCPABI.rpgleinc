@@ -1,3 +1,4 @@
+**free
 // All standalone MCP handler *PGM objects use these fixed buffer sizes.
 // Keep their four by-reference PI arguments in this exact order:
 // argsJson CHAR(8192), resultJson CHAR(8192), resultLen INT(10),

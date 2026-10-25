@@ -62,21 +62,25 @@ dcl-proc resolveServer export;
   return *on;
 end-proc;
 
-// Build one bounded MCP list from rows belonging to the selected server.
-// Db2 quotes public text; the stored schema is appended as JSON only after
-// syntax checking. We never silently omit tools if limits are exceeded.
+// Build one bounded page from the selected server's tools. A cursor is the
+// last public tool name returned; the client can request the next page.
+// Db2 quotes public text; stored schemas are appended after syntax checking.
 dcl-proc listRegisteredTools export;
   dcl-pi *n varchar(8192);
     toolTable char(10) const;
+    requestedCursor varchar(64) const;
   end-pi;
   dcl-s sqlText varchar(1024);
   dcl-s toolName varchar(64);
   dcl-s description varchar(256);
   dcl-s schemaJson varchar(2048);
-  dcl-s baseJson varchar(1024);
+  dcl-s baseJson varchar(4096);
   dcl-s resultJson varchar(8192) inz('{"tools":[');
   dcl-s toolCount int(10) inz(0);
   dcl-s validJson int(10);
+  dcl-s hasMore ind inz(*off);
+  dcl-s lastName varchar(64);
+  dcl-s cursorArray varchar(512);
 
   if not validToolTable(toolTable);
     return '';
@@ -84,13 +88,14 @@ dcl-proc listRegisteredTools export;
   sqlText = 'SELECT TOOLNAME, DESCR, SCHEMAJSON FROM MCPLIB.' +
             %trim(toolTable) +
             ' WHERE STATE = ''A'' AND TOOL_LVL = ''R''' +
+            ' AND TOOLNAME > ?' +
             ' ORDER BY TOOLNAME';
   exec sql prepare listStmt from :sqlText;
   if sqlcode <> 0;
     return '';
   endif;
   exec sql declare listCur cursor for listStmt;
-  exec sql open listCur;
+  exec sql open listCur using :requestedCursor;
   if sqlcode <> 0;
     return '';
   endif;
@@ -104,10 +109,10 @@ dcl-proc listRegisteredTools export;
       exec sql close listCur;
       return '';
     endif;
-    toolCount += 1;
-    if toolCount > 20;
-      exec sql close listCur;
-      return '';
+    // Fetch one row beyond the page limit so we can advertise nextCursor.
+    if toolCount >= 20;
+      hasMore = *on;
+      leave;
     endif;
     exec sql
       values case when :schemaJson is json object with unique keys
@@ -119,29 +124,48 @@ dcl-proc listRegisteredTools export;
     exec sql values json_object(
       'name' value :toolName,
       'description' value :description
-      returning varchar(1024)) into :baseJson;
+      returning varchar(4096)) into :baseJson;
     if sqlcode <> 0;
       exec sql close listCur;
       return '';
     endif;
     // JSON_OBJECT supplied the closing }. Replace it with a nested object.
     baseJson = %trim(baseJson);
+    // Reserve enough bytes for closing JSON and an escaped nextCursor.
+    // One maximum-size row still fits, so only later rows cause a new page.
     if %len(resultJson) + %len(baseJson) +
-       %len(%trim(schemaJson)) + 32 > 8192;
-      exec sql close listCur;
-      return '';
+       %len(%trim(schemaJson)) + 640 > 8192;
+      if toolCount = 0;
+        exec sql close listCur;
+        return '';
+      endif;
+      hasMore = *on;
+      leave;
     endif;
-    if toolCount > 1;
+    if toolCount > 0;
       resultJson += ',';
     endif;
     resultJson += %subst(baseJson: 1: %len(baseJson) - 1) +
                   ',"inputSchema":' + %trim(schemaJson) + '}';
+    lastName = toolName;
+    toolCount += 1;
   enddo;
   exec sql close listCur;
   if sqlcode <> 0;
     return '';
   endif;
-  return resultJson + ']}';
+  resultJson += ']';
+  if hasMore;
+    // JSON_ARRAY escapes the cursor before it enters the response object.
+    exec sql values json_array(:lastName returning varchar(512))
+      into :cursorArray;
+    if sqlcode <> 0;
+      return '';
+    endif;
+    resultJson += ',"nextCursor":' +
+      %subst(cursorArray: 2: %len(cursorArray) - 2);
+  endif;
+  return resultJson + '}';
 end-proc;
 
 // Lookup is scoped to one server's table and to published READ tools.
