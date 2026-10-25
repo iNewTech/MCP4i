@@ -1,0 +1,58 @@
+{
+  "skill_name": "mcp4i-lessons",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "new-lesson-11-rag",
+      "prompt": "The roadmap says RAG is a later extension after the read-only foundation is reliable. I want Lesson 11 on that — retrieving relevant material before answering, applied to IBM i source and docs. Write it and make sure it shows up in the roadmap and the index.",
+      "expected_output": "A new docs/lesson-11-*.md that matches the house chapter structure, plus rows added to the roadmap and learning-index tables.",
+      "files": [],
+      "assertions": [
+        "Creates a new chapter file named docs/lesson-11-<slug>.md",
+        "H1 reads '# Lesson 11 — <Title>' using an em dash",
+        "Line 3 is the nav line beginning '[Learning index](README.md)'",
+        "Carries a bold '**Project milestone:**' or '**Project connection:**' line in the first 12 lines",
+        "Ends with a '## Summary' containing a paired **English:** / **Hinglish:** line",
+        "Every **Hinglish:** line is Roman script with no Devanagari characters",
+        "Includes a paper walkthrough that traces a fictional request in numbered steps",
+        "Uses the house fictional identifiers (APPLIB, DEV, or an established tool name from the Phase 1 catalogue)",
+        "Adds a row for Lesson 11 to the chapter table in docs/00-roadmap.md",
+        "Adds a row for Lesson 11 to the chapter table in docs/README.md",
+        "All relative links in the new chapter resolve to real files",
+        "Frames RAG as a later extension rather than claiming it is built or available today"
+      ]
+    },
+    {
+      "id": 1,
+      "eval_name": "revise-lesson-06-references",
+      "prompt": "Lesson 6 is too thin on program references. Add a proper section on why recorded DSPPGMREF-style references miss runtime dependencies — service programs bound at runtime, dynamic calls, SQL routines — with a paper walkthrough that shows the gap.",
+      "expected_output": "An expanded docs/lesson-06-inspection-tools.md with a new section and walkthrough, with the chapter's existing structure preserved.",
+      "files": [],
+      "assertions": [
+        "Preserves the original H1, nav line, and '**Project milestone:**' line unchanged",
+        "Adds substantive new content on runtime dependency gaps covering at least service programs, dynamic calls, and SQL routines",
+        "New content includes a walkthrough using fictional IBM i identifiers in the house style",
+        "The **English:** and **Hinglish:** lines remain present and equal in number",
+        "States explicitly what recorded references do NOT establish, rather than only what they show",
+        "Passes check_lessons.py with zero errors",
+        "Leaves unrelated sections of Lesson 6 substantially untouched",
+        "Keeps the roadmap and learning-index descriptions of Lesson 6 consistent with the revised chapter"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "audit-consistency",
+      "prompt": "Can you go through docs/ and tell me if the lessons have drifted apart? I've been editing them piecemeal and I think some conventions have slipped.",
+      "expected_output": "A report naming real, verifiable convention variations across all ten chapters, separating genuine drift from legitimate variation.",
+      "files": [],
+      "assertions": [
+        "Covers all ten lesson chapters, not a sample",
+        "Identifies at least one real, verifiable variation present in the actual files",
+        "Reports no fabricated findings — every issue named can be confirmed in the source files",
+        "Distinguishes genuine drift from legitimate variation rather than flagging every difference as a defect",
+        "Checks registration in both the roadmap and learning-index tables",
+        "Delivers a report without rewriting the lesson files"
+      ]
+    }
+  ]
+}
