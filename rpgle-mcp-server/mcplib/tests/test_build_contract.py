@@ -41,6 +41,31 @@ class BuildContract(unittest.TestCase):
         self.assertIn("RUNSQLSTM SRCSTMF(", output)
         self.assertIn("SCHEMA.sql", output)
 
+    def test_handler_target_builds_one_reviewed_wrapper_without_schema(self):
+        output = subprocess.check_output(
+            [
+                "make", "-n", "-C", str(ROOT), "handler",
+                "HANDLER_SRC=/home/user/mcplib/generated/MCPWRAP.sqlrpgle",
+                "HANDLER_PGM=MCPWRAP",
+                "HANDLER_LIB=TOOLS",
+            ],
+            text=True,
+        )
+        self.assertIn("CRTSQLRPGI OBJ(TOOLS/MCPWRAP)", output)
+        self.assertIn("CRTPGM PGM(TOOLS/MCPWRAP)", output)
+        self.assertNotIn("RUNSQLSTM", output)
+
+    def test_existing_install_has_explicit_additive_upgrade(self):
+        output = subprocess.check_output(
+            ["make", "-n", "-C", str(ROOT), "upgrade-generation"],
+            text=True,
+        )
+        self.assertIn("UPGRADE_GENERATION.sql", output)
+        self.assertNotIn("SCHEMA.sql", output)
+        driver = (ROOT / "cl" / "BLDMCPLIB.clle").read_text()
+        self.assertIn("IF COND(&MODE *EQ 'UPGRADE')", driver)
+        self.assertIn("'/sql/UPGRADE_GENERATION.sql'", driver)
+
     def test_cl_driver_compiles_same_commands_and_preserves_schema(self):
         source = (ROOT / "cl" / "BLDMCPLIB.clle").read_text()
         for command in (

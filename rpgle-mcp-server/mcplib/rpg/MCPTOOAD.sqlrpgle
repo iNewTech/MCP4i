@@ -33,6 +33,9 @@ dcl-s arg3 varchar(128);
 dcl-s previousSchema varchar(2048);
 dcl-s previousLib char(10);
 dcl-s previousPgm char(10);
+dcl-s previousMode char(1);
+dcl-s previousTargetLib char(10);
+dcl-s previousTargetPgm char(10);
 dcl-s originalState char(1);
 dcl-s loadedTs varchar(26);
 dcl-s ok ind;
@@ -79,10 +82,12 @@ open MCPTOOLD;
 TNAME = toolName;
 TLVL = 'R';
 TSTATE = 'D';
+GMODE = 'M';
 AT1 = 'string'; AT2 = 'string'; AT3 = 'string';
 AR1 = 'N'; AR2 = 'N'; AR3 = 'N';
 if mode = 'E';
-  sqlText = 'SELECT DESCR, HDLLIB, HDLPGM, TOOL_LVL, STATE,' +
+  sqlText = 'SELECT DESCR, HDLLIB, HDLPGM, GENMODE, TGTLIB, TGTPGM,' +
+    ' TOOL_LVL, STATE,' +
     ' ARG1NAME, ARG1TYPE, ARG1REQ, ARG2NAME, ARG2TYPE, ARG2REQ,' +
     ' ARG3NAME, ARG3TYPE, ARG3REQ, SCHEMAJSON,' +
     ' CHAR(CHGTS) FROM MCPLIB.' + %trim(tableName) +
@@ -92,13 +97,17 @@ if mode = 'E';
     exec sql declare loadCur cursor for loadStmt;
     exec sql open loadCur using :toolName;
     if sqlcode = 0;
-      exec sql fetch loadCur into :TDESC, :HLIB, :HPGM, :TLVL, :TSTATE,
+      exec sql fetch loadCur into :TDESC, :HLIB, :HPGM, :GMODE,
+        :TLIB, :TPGM, :TLVL, :TSTATE,
         :AN1, :AT1, :AR1, :AN2, :AT2, :AR2, :AN3, :AT3, :AR3,
         :previousSchema, :loadedTs;
       ok = sqlcode = 0;
       if ok;
         previousLib = HLIB;
         previousPgm = HPGM;
+        previousMode = GMODE;
+        previousTargetLib = TLIB;
+        previousTargetPgm = TPGM;
         originalState = TSTATE;
       endif;
       exec sql close loadCur;
@@ -111,7 +120,7 @@ if mode = 'E';
     return;
   endif;
 endif;
-ERRMSG = 'Enter saves. F3 cancels. Publish A only after reviewing handler authority.';
+ERRMSG = 'G/T save draft. Build wrapper and review target authority before A.';
 dow *on;
   exfmt TOOLREC;
   if *in03;
@@ -135,6 +144,28 @@ dow *on;
     ERRMSG = 'Description and explicit uppercase library/program are required.';
     iter;
   endif;
+  // The native target and MCP handler are distinct *PGM objects. The handler
+  // always receives the four-parameter MCP ABI; a generated handler may call
+  // the selected target with its separately reviewed native parameter list.
+  if GMODE <> 'M' and GMODE <> 'G' and GMODE <> 'T';
+    ERRMSG = 'Mode must be M (manual), G (generate), or T (template).';
+    iter;
+  endif;
+  if GMODE = 'M';
+    if TLIB <> '' or TPGM <> '';
+      ERRMSG = 'Manual mode uses the handler directly; clear target fields.';
+      iter;
+    endif;
+  else;
+    if not validName(TLIB) or not validName(TPGM);
+      ERRMSG = 'Generated modes need an uppercase target library/program.';
+      iter;
+    endif;
+    if HLIB = TLIB and HPGM = TPGM;
+      ERRMSG = 'Handler and native target must be different programs.';
+      iter;
+    endif;
+  endif;
   if %check('RWD':TLVL) <> 0 or %check('DAX':TSTATE) <> 0 or
      (TSTATE = 'A' and TLVL <> 'R');
     ERRMSG = 'States: D draft, A active, X retired. Only READ (R) can be active.';
@@ -151,12 +182,25 @@ dow *on;
     ERRMSG = 'Arguments need unique names, supported types, and Y/N required flags.';
     iter;
   endif;
-  sqlText = 'CHKOBJ OBJ(' + %trim(HLIB) + '/' + %trim(HPGM) +
-            ') OBJTYPE(*PGM)';
-  exec sql call QSYS2.QCMDEXC(:sqlText);
-  if sqlcode <> 0;
-    ERRMSG = 'Qualified handler *PGM does not exist or is not accessible.';
-    iter;
+  // G/T are intentionally saved as draft before source generation. A manual
+  // tool, or any tool being published, must already have a compiled handler.
+  if GMODE = 'M' or TSTATE = 'A';
+    sqlText = 'CHKOBJ OBJ(' + %trim(HLIB) + '/' + %trim(HPGM) +
+              ') OBJTYPE(*PGM)';
+    exec sql call QSYS2.QCMDEXC(:sqlText);
+    if sqlcode <> 0;
+      ERRMSG = 'Qualified handler *PGM does not exist or is not accessible.';
+      iter;
+    endif;
+  endif;
+  if GMODE = 'G' or GMODE = 'T';
+    sqlText = 'CHKOBJ OBJ(' + %trim(TLIB) + '/' + %trim(TPGM) +
+              ') OBJTYPE(*PGM)';
+    exec sql call QSYS2.QCMDEXC(:sqlText);
+    if sqlcode <> 0;
+      ERRMSG = 'Qualified target *PGM does not exist or is not accessible.';
+      iter;
+    endif;
   endif;
   clear properties;
   clear requiredList;
@@ -174,22 +218,26 @@ dow *on;
     '},"required":[' + requiredList + '],"additionalProperties":false}';
   if mode = 'E' and originalState = 'A' and TSTATE = 'A' and
      (HLIB <> previousLib or HPGM <> previousPgm or
+      GMODE <> previousMode or TLIB <> previousTargetLib or
+      TPGM <> previousTargetPgm or
       schemaJson <> previousSchema);
-    ERRMSG = 'Save handler or schema changes as draft, then review and publish.';
+    ERRMSG = 'Save handler, target or schema changes as draft; then review.';
     iter;
   endif;
   description = %trim(TDESC);
   arg1 = %trim(AN1); arg2 = %trim(AN2); arg3 = %trim(AN3);
   if mode = 'A';
     sqlText = 'INSERT INTO MCPLIB.' + %trim(tableName) +
-      ' (DESCR, HDLLIB, HDLPGM, TOOL_LVL, STATE, SCHEMAJSON,' +
+      ' (DESCR, HDLLIB, HDLPGM, GENMODE, TGTLIB, TGTPGM,' +
+      ' TOOL_LVL, STATE, SCHEMAJSON,' +
       ' ARG1NAME, ARG1TYPE, ARG1REQ, ARG2NAME, ARG2TYPE, ARG2REQ,' +
       ' ARG3NAME, ARG3TYPE, ARG3REQ, TOOLNAME, CRTBY, CHGBY)' +
-      ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,' +
+      ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,' +
       ' CURRENT_USER, CURRENT_USER)';
   else;
     sqlText = 'UPDATE MCPLIB.' + %trim(tableName) +
-      ' SET DESCR=?, HDLLIB=?, HDLPGM=?, TOOL_LVL=?, STATE=?,' +
+      ' SET DESCR=?, HDLLIB=?, HDLPGM=?, GENMODE=?, TGTLIB=?, TGTPGM=?,' +
+      ' TOOL_LVL=?, STATE=?,' +
       ' SCHEMAJSON=?, ARG1NAME=?, ARG1TYPE=?, ARG1REQ=?,' +
       ' ARG2NAME=?, ARG2TYPE=?, ARG2REQ=?, ARG3NAME=?, ARG3TYPE=?,' +
       ' ARG3REQ=?, CHGBY=CURRENT_USER, CHGTS=CURRENT_TIMESTAMP' +
@@ -199,10 +247,12 @@ dow *on;
   if sqlcode = 0;
     if mode = 'A';
       exec sql execute saveStmt using :description, :HLIB, :HPGM,
+        :GMODE, :TLIB, :TPGM,
         :TLVL, :TSTATE, :schemaJson, :arg1, :AT1, :AR1, :arg2, :AT2,
         :AR2, :arg3, :AT3, :AR3, :toolName;
     else;
       exec sql execute saveStmt using :description, :HLIB, :HPGM,
+        :GMODE, :TLIB, :TPGM,
         :TLVL, :TSTATE, :schemaJson, :arg1, :AT1, :AR1, :arg2, :AT2,
         :AR2, :arg3, :AT3, :AR3, :toolName, :loadedTs;
     endif;

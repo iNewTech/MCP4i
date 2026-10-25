@@ -1,0 +1,24 @@
+{
+  "mode": "G",
+  "handler": {"library": "MCPLIB", "program": "CUSTLOOK"},
+  "target": {"library": "APPLIB", "program": "GETCUST"},
+  "signatureConfirmed": true,
+  "callingConvention": "by_reference",
+  "parameters": [
+    {
+      "name": "CUSTNO",
+      "jsonName": "customer_no",
+      "type": "char",
+      "length": 10,
+      "direction": "in",
+      "required": true
+    },
+    {
+      "name": "CUSTNAME",
+      "jsonName": "customer_name",
+      "type": "char",
+      "length": 50,
+      "direction": "out"
+    }
+  ]
+}

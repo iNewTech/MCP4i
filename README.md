@@ -37,7 +37,7 @@ For the [TypeScript CLI starter](cli_project_ts/README.md), use Node.js 22.19+ a
 
 ## Build the RPGLE MCP server
 
-For the new configurable application, start with the [MCPLIB guide](rpgle-mcp-server/mcplib/README.md). It maps IFS source to IBM i objects, shows the one-time schema and repeatable IFS/CL builds, and explains the DDS commands for servers and independent tool programs. HTTP instance provisioning is the next milestone.
+For the new configurable application, start with the [MCPLIB guide](rpgle-mcp-server/mcplib/README.md). It maps IFS source to IBM i objects, shows the one-time schema and repeatable IFS/CL builds, and explains the DDS commands for servers and tools. It also shows how to generate a reviewed MCP handler around an existing read-only IBM i program or start from an editable template. HTTP instance provisioning is the next milestone.
 
 The [RPGLE MCP server guide](rpgle-mcp-server/README.md) explains the IBM i library, compile and bind commands, dedicated job queue and subsystem, HTTP instance, start/stop commands, and live smoke test. [MCPHTTP.sqlrpgle](rpgle-mcp-server/MCPHTTP.sqlrpgle) handles CGI and registers two read-only tools, each implemented in its own bound RPG module: `get_system_info` and `get_library_list`. Its [HTTP configuration](rpgle-mcp-server/httpd.conf.example) and [smoke test](rpgle-mcp-server/smoke_test.py) are separate files. This slice has not yet been compiled or tested on a real IBM i partition.
 
@@ -76,7 +76,7 @@ You can complete the first two lessons without an IBM i connection, credentials,
 
 ## Phase 1 boundary
 
-Expose read-only capabilities. Exclude data changes, arbitrary CL commands, program execution, and job submission or control. `run_sql` is a later, restricted SELECT-only capability whose complete query and dependencies must be checked; a SELECT prefix alone is insufficient.
+Expose read-only capabilities. Exclude data changes, arbitrary CL commands, unrestricted program execution, and job submission or control. A reviewed program that only reads data can be exposed through a dedicated handler; publishing it still requires checking its behavior and authority. `run_sql` is a later, restricted SELECT-only capability whose complete query and dependencies must be checked; a SELECT prefix alone is insufficient.
 
 The [Phase 1 roadmap](project/phase-01-readonly-tools.md) is the source of truth for tool names, scope, limits, and deferred capabilities.
 

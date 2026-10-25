@@ -137,6 +137,7 @@ dow *on;
         ' ADD CHECK (TOOL_LVL IN (''R'', ''W'', ''D'')' +
         ' AND STATE IN (''D'', ''A'', ''X'')' +
         ' AND (STATE <> ''A'' OR TOOL_LVL = ''R'')' +
+        ' AND GENMODE IN (''M'', ''G'', ''T'')' +
         ' AND ARG1TYPE IN (''string'', ''integer'',' +
         ' ''number'', ''boolean'')' +
         ' AND ARG1REQ IN (''Y'', ''N'')' +
@@ -146,6 +147,14 @@ dow *on;
         ' AND ARG3TYPE IN (''string'', ''integer'',' +
         ' ''number'', ''boolean'')' +
         ' AND ARG3REQ IN (''Y'', ''N''))');
+    endif;
+    if ok;
+      // Constraint names must be unique within MCPLIB, so derive one from
+      // this server's table number. The upgrade script uses the same name.
+      ok = runSql('ALTER TABLE MCPLIB.' + %trim(toolFile) +
+        ' ADD CONSTRAINT G' + %subst(toolFile:2:7) +
+        ' CHECK (GENMODE = ''M'' OR' +
+        ' (TGTLIB <> '''' AND TGTPGM <> ''''))');
     endif;
     if ok;
       sqlText = 'INSERT INTO MCPLIB.' + %trim(cfgFile) +

@@ -1,5 +1,7 @@
 /* ILE CL build driver for source already copied into the IBM i IFS.      */
-/* MODE='SCHEMA' creates data files once; MODE='APP' rebuilds code only. */
+/* SCHEMA creates files once; UPGRADE adds tool columns to old installs.   */
+/* APP rebuilds code only. Never use SCHEMA to upgrade an installation.   */
+/* Customer MCP wrappers are compiled separately after source review.    */
 /* SRCROOT is the absolute IFS path to this mcplib directory, no slash.  */
 PGM PARM(&MODE &SRCROOT)
   DCL VAR(&MODE) TYPE(*CHAR) LEN(10)
@@ -24,8 +26,18 @@ PGM PARM(&MODE &SRCROOT)
     RETURN
   ENDDO
 
+  IF COND(&MODE *EQ 'UPGRADE') THEN(DO)
+    /* Add columns to MCPTOOLT and existing Tnnnnnnn files in place. */
+    CHKOBJ OBJ(MCPLIB/MCPCAT) OBJTYPE(*FILE)
+    CHKOBJ OBJ(MCPLIB/MCPTOOLT) OBJTYPE(*FILE)
+    CHGVAR VAR(&STMF) VALUE(&SRCROOT *TCAT '/sql/UPGRADE_GENERATION.sql')
+    RUNSQLSTM SRCSTMF(&STMF) COMMIT(*NONE) NAMING(*SQL)
+    RETURN
+  ENDDO
+
   IF COND(&MODE *NE 'APP') THEN(DO)
-    SNDPGMMSG MSG('MODE must be APP or SCHEMA.') MSGTYPE(*ESCAPE)
+    SNDPGMMSG MSG('MODE must be APP, SCHEMA or UPGRADE.') +
+      MSGTYPE(*ESCAPE)
   ENDDO
 
   /* Static SQL in the administrative programs needs these data files. */

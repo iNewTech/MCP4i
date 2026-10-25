@@ -1,5 +1,7 @@
 """Source contract checks only; IBM i compilation remains required."""
 from pathlib import Path
+import re
+import sqlite3
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,6 +132,28 @@ class AdminDdsTypes(unittest.TestCase):
         for field in ('AT1', 'AT2', 'AT3'):
             line = next(line for line in lines if field in line and 'A  B' in line)
             self.assertIn('CHECK(LC)', line)
+
+
+class GeneratedToolSchema(unittest.TestCase):
+    def test_generated_modes_require_a_native_target(self):
+        source = (ROOT / 'sql/SCHEMA.sql').read_text()
+        ddl = re.sub(r'--[^\n]*', '', source).replace('MCPLIB.', '')
+        db = sqlite3.connect(':memory:')
+        self.addCleanup(db.close)
+        db.executescript(ddl)
+        insert = ('INSERT INTO MCPTOOLT '
+                  '(TOOLNAME, DESCR, HDLLIB, HDLPGM, GENMODE, TGTLIB, TGTPGM) '
+                  'VALUES (?, ?, ?, ?, ?, ?, ?)')
+        base = ('lookup', 'Lookup', 'MCPLIB', 'WRAPPER')
+        with self.assertRaises(sqlite3.IntegrityError):
+            db.execute(insert, (*base, 'G', '', ''))
+        with self.assertRaises(sqlite3.IntegrityError):
+            db.execute(insert, (*base, 'T', 'APPLIB', ''))
+        with self.assertRaises(sqlite3.IntegrityError):
+            db.execute(insert, (*base, 'Q', 'APPLIB', 'LOOKUP'))
+        db.execute(insert, (*base, 'G', 'APPLIB', 'LOOKUP'))
+        self.assertEqual(db.execute('SELECT STATE FROM MCPTOOLT').fetchone(),
+                         ('D',))
 
 if __name__ == '__main__':
     unittest.main()

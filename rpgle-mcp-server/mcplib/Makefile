@@ -7,12 +7,27 @@ SRCROOT ?= $(CURDIR)
 SYSTEM ?= system -K
 RPGOPT = COMPILEOPT('INCDIR(''$(SRCROOT)/copy'')')
 
-.PHONY: help schema app ensure-library verify-schema dds-source displays modules programs commands check
+.PHONY: help schema upgrade-generation app handler ensure-library verify-schema dds-source displays modules programs commands check
 .NOTPARALLEL:
 
 help:
 	@echo 'IBM i PASE: make schema (once), then make app (repeatable)'
+	@echo 'Existing installation only: make upgrade-generation before make app'
+	@echo 'One generated tool: make handler HANDLER_SRC=/absolute/path/TOOL.sqlrpgle HANDLER_PGM=TOOL [HANDLER_LIB=MCPLIB]'
 	@echo 'Developer workstation: make check; make -n app previews CL commands'
+
+# A generated wrapper is a separate *PGM and is compiled only after its
+# source has been reviewed. It is intentionally not a prerequisite of app:
+# app must never replace customer handlers or publish draft tools.
+HANDLER_LIB ?= $(LIB)
+HANDLER_SRC ?=
+HANDLER_PGM ?=
+
+handler:
+	@test -n '$(HANDLER_SRC)' && test -n '$(HANDLER_PGM)' || { echo 'Set HANDLER_SRC and HANDLER_PGM'; exit 2; }
+	@test -f '$(HANDLER_SRC)' || { echo 'Handler source not found: $(HANDLER_SRC)'; exit 2; }
+	$(SYSTEM) "CRTSQLRPGI OBJ($(HANDLER_LIB)/$(HANDLER_PGM)) SRCSTMF('$(HANDLER_SRC)') OBJTYPE(*MODULE) COMMIT(*NONE) RDB(*NONE) OUTPUT(*PRINT) RPGPPOPT(*LVL2) INCDIR('$(SRCROOT)/copy') $(RPGOPT) REPLACE(*YES)"
+	$(SYSTEM) "CRTPGM PGM($(HANDLER_LIB)/$(HANDLER_PGM)) MODULE($(HANDLER_LIB)/$(HANDLER_PGM)) REPLACE(*YES)"
 
 ensure-library:
 	@$(SYSTEM) "CHKOBJ OBJ($(LIB)) OBJTYPE(*LIB)" >/dev/null 2>&1 || $(SYSTEM) "CRTLIB LIB($(LIB)) TEXT('MCP for i application')"
@@ -21,6 +36,12 @@ ensure-library:
 # creates the shared catalog/templates and must run only during installation.
 schema: ensure-library
 	$(SYSTEM) "RUNSQLSTM SRCSTMF('$(SRCROOT)/sql/SCHEMA.sql') COMMIT(*NONE) NAMING(*SQL)"
+
+# Add generation metadata in place to an installation created before these
+# columns existed. The SQL guards each ALTER and retains every registry row.
+# Do not run `schema` again against an existing installation.
+upgrade-generation: verify-schema
+	$(SYSTEM) "RUNSQLSTM SRCSTMF('$(SRCROOT)/sql/UPGRADE_GENERATION.sql') COMMIT(*NONE) NAMING(*SQL)"
 
 verify-schema: ensure-library
 	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPCAT) OBJTYPE(*FILE)"
