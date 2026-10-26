@@ -1,6 +1,7 @@
 **free
-// Standalone *PGM handler for get_system_info. The registry can call this
-// program without binding it into MCPHTTP. It returns data, not MCP/HTTP.
+// SYSINFHND is the standalone *PGM handler for get_system_info.
+// The registry calls it without binding it into MCPHTTP. It returns data,
+// not MCP/HTTP.
 ctl-opt dftactgrp(*no) actgrp(*caller) option(*srcstmt:*nodebugio);
 
 exec sql set option commit = *none, naming = *sql;
