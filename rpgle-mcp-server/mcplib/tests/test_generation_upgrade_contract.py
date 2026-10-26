@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class GenerationUpgradeContract(unittest.TestCase):
     def test_upgrade_covers_template_and_all_registered_server_tables(self):
         sql = (ROOT / "sql/UPGRADE_GENERATION.sql").read_text()
-        self.assertIn("SELECT 'MCPTOOLT' AS REG_NAME", sql)
+        self.assertIn("SELECT 'MCPTOOLTPL' AS REG_NAME", sql)
         self.assertIn("SELECT TRIM(TOOLFILE) AS REG_NAME FROM MCPLIB.MCPSERVERS", sql)
         for column in ("GENMODE", "TGTLIB", "TGTPGM"):
             self.assertIn(f"COLUMN_NAME = '{column}'", sql)
@@ -33,6 +33,23 @@ class GenerationUpgradeContract(unittest.TestCase):
         self.assertIn("ELSEIF OLD_COUNT = 0 AND NEW_COUNT = 1", sql)
         self.assertIn("SIGNAL SQLSTATE", sql)
         self.assertIn("RENAME TABLE MCPLIB.MCPCAT TO MCPSERVERS", sql)
+        for destructive_sql in ("DROP TABLE", "CREATE TABLE", "INSERT INTO", "DELETE FROM"):
+            with self.subTest(statement=destructive_sql):
+                self.assertNotIn(destructive_sql, sql)
+
+    def test_template_renames_preflight_both_pairs_and_keep_existing_files(self):
+        sql = (ROOT / "sql/RENAME_TEMPLATES.sql").read_text().upper()
+        self.assertEqual(sql.count("FROM QSYS2.SYSTABLES"), 4)
+        for old, new in (("MCPCFGT", "MCPCFGTMPL"),
+                         ("MCPTOOLT", "MCPTOOLTPL")):
+            with self.subTest(old=old, new=new):
+                self.assertIn(f"TABLE_NAME = '{old}'", sql)
+                self.assertIn(f"TABLE_NAME = '{new}'", sql)
+                self.assertIn(f"RENAME TABLE MCPLIB.{old} TO {new}", sql)
+        guard = sql.index("IF OLD_CONFIG_COUNT + NEW_CONFIG_COUNT <> 1 OR")
+        self.assertLess(guard, sql.index("RENAME TABLE MCPLIB.MCPCFGT"))
+        self.assertIn("OLD_TOOL_COUNT + NEW_TOOL_COUNT <> 1", sql)
+        self.assertIn("SIGNAL SQLSTATE", sql)
         for destructive_sql in ("DROP TABLE", "CREATE TABLE", "INSERT INTO", "DELETE FROM"):
             with self.subTest(statement=destructive_sql):
                 self.assertNotIn(destructive_sql, sql)

@@ -1,5 +1,5 @@
 /* ILE CL build driver for source already copied into the IBM i IFS.      */
-/* SCHEMA creates files once; UPGRADE renames the catalog and adds columns. */
+/* SCHEMA creates files once; UPGRADE renames files and adds columns.       */
 /* APP rebuilds code only. Never use SCHEMA to upgrade an installation.   */
 /* Customer MCP wrappers are compiled separately after source review.    */
 /* SRCROOT is the absolute IFS path to this mcplib directory, no slash.  */
@@ -27,14 +27,18 @@ PGM PARM(&MODE &SRCROOT)
   ENDDO
 
   IF COND(&MODE *EQ 'UPGRADE') THEN(DO)
-    /* Rename the shared catalog before the generation upgrade reads it. */
+    /* Rename the shared catalog and templates before column upgrades. */
     /* Stop HTTP and 5250 administration traffic before this mode. */
-    CHKOBJ OBJ(MCPLIB/MCPTOOLT) OBJTYPE(*FILE)
     CHGVAR VAR(&STMF) VALUE(&SRCROOT *TCAT '/sql/RENAME_SERVERS.sql')
     RUNSQLSTM SRCSTMF(&STMF) COMMIT(*NONE) NAMING(*SQL) +
       ERRLVL(10)
+    CHGVAR VAR(&STMF) VALUE(&SRCROOT *TCAT '/sql/RENAME_TEMPLATES.sql')
+    RUNSQLSTM SRCSTMF(&STMF) COMMIT(*NONE) NAMING(*SQL) +
+      ERRLVL(10)
     CHKOBJ OBJ(MCPLIB/MCPSERVERS) OBJTYPE(*FILE)
-    /* Add columns to MCPTOOLT and existing Tnnnnnnn files in place. */
+    CHKOBJ OBJ(MCPLIB/MCPCFGTMPL) OBJTYPE(*FILE)
+    CHKOBJ OBJ(MCPLIB/MCPTOOLTPL) OBJTYPE(*FILE)
+    /* Add columns to MCPTOOLTPL and existing Tnnnnnnn files in place. */
     CHGVAR VAR(&STMF) VALUE(&SRCROOT *TCAT '/sql/UPGRADE_GENERATION.sql')
     RUNSQLSTM SRCSTMF(&STMF) COMMIT(*NONE) NAMING(*SQL)
     RETURN
@@ -47,8 +51,8 @@ PGM PARM(&MODE &SRCROOT)
 
   /* Static SQL in the administrative programs needs these data files. */
   CHKOBJ OBJ(MCPLIB/MCPSERVERS) OBJTYPE(*FILE)
-  CHKOBJ OBJ(MCPLIB/MCPCFGT) OBJTYPE(*FILE)
-  CHKOBJ OBJ(MCPLIB/MCPTOOLT) OBJTYPE(*FILE)
+  CHKOBJ OBJ(MCPLIB/MCPCFGTMPL) OBJTYPE(*FILE)
+  CHKOBJ OBJ(MCPLIB/MCPTOOLTPL) OBJTYPE(*FILE)
 
   /* DDS cannot be compiled directly from SRCSTMF. Keep only DDS source
      in QDDSSRC; the registry tables and their rows are left alone. */

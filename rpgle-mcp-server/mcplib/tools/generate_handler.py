@@ -20,7 +20,7 @@ OBJECT_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,9}\Z")
 JSON_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
 MAX_PARAMETERS = 32
 MAX_INPUTS = 3  # The current ADDMCPTOOL display exposes ARG1..ARG3.
-MAX_SCHEMA_BYTES = 2048  # MCPTOOLT.SCHEMAJSON is VARCHAR(2048).
+MAX_SCHEMA_BYTES = 2048  # MCPTOOLTPL.SCHEMAJSON is VARCHAR(2048).
 
 
 class ManifestError(ValueError):

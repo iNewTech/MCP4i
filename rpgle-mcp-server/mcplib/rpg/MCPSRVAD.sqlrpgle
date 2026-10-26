@@ -113,7 +113,7 @@ dow *on;
     cfgFile = 'S' + %digits(serialName);
     toolFile = 'T' + %digits(serialName);
     cfgMade = runSql('CREATE TABLE MCPLIB.' + %trim(cfgFile) +
-      ' LIKE MCPLIB.MCPCFGT INCLUDING COLUMN DEFAULTS');
+      ' LIKE MCPLIB.MCPCFGTMPL INCLUDING COLUMN DEFAULTS');
     ok = cfgMade;
     if ok;
       ok = runSql('ALTER TABLE MCPLIB.' + %trim(cfgFile) +
@@ -125,7 +125,7 @@ dow *on;
     endif;
     if ok;
       toolMade = runSql('CREATE TABLE MCPLIB.' + %trim(toolFile) +
-        ' LIKE MCPLIB.MCPTOOLT INCLUDING COLUMN DEFAULTS');
+        ' LIKE MCPLIB.MCPTOOLTPL INCLUDING COLUMN DEFAULTS');
       ok = toolMade;
     endif;
     if ok;

@@ -8,7 +8,7 @@ This milestone supplies source, DDS administration screens, two sample read-only
 
 | Source | IBM i objects | Purpose |
 | --- | --- | --- |
-| [sql/SCHEMA.sql](sql/SCHEMA.sql), [sql/RENAME_SERVERS.sql](sql/RENAME_SERVERS.sql), [sql/UPGRADE_GENERATION.sql](sql/UPGRADE_GENERATION.sql) | `MCPSERVERS`, `MCPCFGT`, `MCPTOOLT` `*FILE` | One-time catalog/templates, an in-place rename of the old `MCPCAT` catalog, and an additive upgrade for existing tool tables. `CRTMCPSRV` allocates per-server `Snnnnnnn` and `Tnnnnnnn` files. |
+| [sql/SCHEMA.sql](sql/SCHEMA.sql), [sql/RENAME_SERVERS.sql](sql/RENAME_SERVERS.sql), [sql/RENAME_TEMPLATES.sql](sql/RENAME_TEMPLATES.sql), [sql/UPGRADE_GENERATION.sql](sql/UPGRADE_GENERATION.sql) | `MCPSERVERS`, `MCPCFGTMPL`, `MCPTOOLTPL` `*FILE` | One-time server registry and empty templates, in-place renames of their old names, and an additive upgrade for existing tool tables. `MCPCFGTMPL` is the server configuration template; `MCPTOOLTPL` is the tool definition template. `CRTMCPSRV` allocates per-server `Snnnnnnn` and `Tnnnnnnn` files from them. |
 | [dds/MCPSRVD.dspf](dds/MCPSRVD.dspf), [dds/MCPTOOLD.dspf](dds/MCPTOOLD.dspf) | `MCPSRVD`, `MCPTOOLD` `*DSPF` | 5250 screens for server and tool details. DDS is copied to `MCPLIB/QDDSSRC` before compilation. |
 | [rpg/MCPSRVAD.sqlrpgle](rpg/MCPSRVAD.sqlrpgle), [rpg/MCPTOOLADD.sqlrpgle](rpg/MCPTOOLADD.sqlrpgle) | `MCPSRVAD`, `MCPTOOLADD` `*PGM` | Validate screen input and save server/tool rows. `MCPTOOLADD` handles add, edit, and retire commands. |
 | [rpg/MCPSRVOP.sqlrpgle](rpg/MCPSRVOP.sqlrpgle) | `MCPSRVOP` `*PGM` | Start/end wrapper; rejects an unprovisioned HTTP instance. |
@@ -32,7 +32,7 @@ make app     # compiles DDS, modules, programs, and seven commands
 
 `make app` checks that the schema exists and never runs `RUNSQLSTM`, drops a table, or replaces rows. Run it again after editing application source. `make schema` is intentionally explicit and will fail if its tables already exist; it is not an upgrade or migration command. The build compiles the two DDS stream files through `QDDSSRC`, because `CRTDSPF` uses source members rather than `SRCSTMF`. The SQL RPG and command compilers read their source directly from IFS stream files. `make app` intentionally does not rebuild customer tool handlers.
 
-For an existing MCPLIB installation using `MCPCAT`, or one installed before the `GENMODE`, `TGTLIB`, and `TGTPGM` columns were added, stop each HTTP instance serving `MCPHTTP`, let in-flight requests finish, and pause 5250 administration commands. Then run the upgrade and rebuild the application:
+For an existing MCPLIB installation using `MCPCAT`, `MCPCFGT`, or `MCPTOOLT`, or one installed before the `GENMODE`, `TGTLIB`, and `TGTPGM` columns were added, stop each HTTP instance serving `MCPHTTP`, let in-flight requests finish, and pause 5250 administration commands. Then run the upgrade and rebuild the application:
 
 ```sh
 cd /home/builduser/mcplib
@@ -40,7 +40,9 @@ make upgrade-generation
 make app
 ```
 
-`make upgrade-generation` first runs [RENAME_SERVERS.sql](sql/RENAME_SERVERS.sql), which renames `MCPLIB/MCPCAT` to `MCPLIB/MCPSERVERS` **in place**. It preserves server rows and their existing table constraints; it does not create, copy, or delete a catalog table. If only `MCPSERVERS` exists, the rename is a no-op. If both names exist or neither exists, it stops so you can inspect the installation. The second script checks the empty `MCPTOOLT` template and each existing server's tool table, adds missing columns, and leaves existing rows as mode `M`. Both scripts are designed to be rerunnable; neither calls the one-time `SCHEMA.sql`. You can run `make upgrade-catalog` alone if only the name migration is needed, but rebuild with `make app` afterward because the programs use the new name in static SQL. Inspect the RUNSQLSTM job log/listing if either script fails. After `make app` succeeds, restart the HTTP instance(s), resume administration, and verify a known tool before restoring client traffic. A fresh installation from this revision needs only `make schema` followed by `make app`.
+`make upgrade-generation` runs [RENAME_SERVERS.sql](sql/RENAME_SERVERS.sql) first, renaming `MCPLIB/MCPCAT` to `MCPLIB/MCPSERVERS` in place. It then runs [RENAME_TEMPLATES.sql](sql/RENAME_TEMPLATES.sql), renaming `MCPLIB/MCPCFGT` to `MCPLIB/MCPCFGTMPL` and `MCPLIB/MCPTOOLT` to `MCPLIB/MCPTOOLTPL` in place. The renames retain rows, constraints, and authorities; they do not create, copy, or delete tables. Each script accepts a table that already has its new name, and stops if both names or neither name exist. Existing per-server `Snnnnnnn` and `Tnnnnnnn` files keep their names and data. Finally, [UPGRADE_GENERATION.sql](sql/UPGRADE_GENERATION.sql) checks `MCPTOOLTPL` and every registered server's tool file, adds missing columns, and leaves existing rows as mode `M`.
+
+All three scripts are designed to be rerunnable; none calls the one-time `SCHEMA.sql`. Run `make upgrade-catalog` alone if only the three name migrations are needed, but rebuild with `make app` afterward because the programs use the new names. Inspect the RUNSQLSTM job log/listing if any script fails. After `make app` succeeds, restart the HTTP instance(s), resume administration, and verify a known tool before restoring client traffic. A fresh installation from this revision needs only `make schema` followed by `make app`.
 
 To launch the same IFS build from your workstation, transfer the source directory and use SSH:
 
@@ -64,7 +66,7 @@ CALL PGM(MCPLIB/BLDMCPLIB) PARM(('APP' (*CHAR 10)) ('/home/builduser/mcplib' (*C
 
 Use the `SCHEMA` call only for the first install; use `APP` for later code rebuilds. Recompile `BLDMCPLIB` with the `CRTBNDCL` command above when its own source changes. The explicit parameter lengths matter: a bare character literal on IBM i `CALL` normally occupies at least 32 bytes, while this program declares a 10-byte mode and a 256-byte path. The `APP` branch follows the same application object order and preserves registry data, just like the Makefile.
 
-For an existing installation, stop MCP HTTP and 5250 administration traffic as described above. After recompiling `BLDMCPLIB`, invoke its `UPGRADE` mode before `APP`, then restart and verify the HTTP instance(s). `UPGRADE` performs the catalog rename before the column upgrade; do not invoke `SCHEMA` on an existing installation:
+For an existing installation, stop MCP HTTP and 5250 administration traffic as described above. After recompiling `BLDMCPLIB`, invoke its `UPGRADE` mode before `APP`, then restart and verify the HTTP instance(s). `UPGRADE` renames the server registry and both templates before the column upgrade; do not invoke `SCHEMA` on an existing installation:
 
 ```cl
 CALL PGM(MCPLIB/BLDMCPLIB) PARM(('UPGRADE' (*CHAR 10)) ('/home/builduser/mcplib' (*CHAR 256)))

@@ -27,11 +27,11 @@ class SchemaContract(unittest.TestCase):
     def tool(self, **values):
         row = dict(TOOLNAME='get_info', DESCR='Reviewed handler', HDLLIB='MCPLIB', HDLPGM='MCPINFO')
         row.update(values)
-        self.db.execute(f"INSERT INTO MCPTOOLT ({','.join(row)}) VALUES ({','.join('?' for _ in row)})", tuple(row.values()))
+        self.db.execute(f"INSERT INTO MCPTOOLTPL ({','.join(row)}) VALUES ({','.join('?' for _ in row)})", tuple(row.values()))
 
     def test_system_identifiers_fit_ibm_i_and_templates_start_empty(self):
         tables = [row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-        self.assertEqual(set(tables), {'MCPSERVERS', 'MCPCFGT', 'MCPTOOLT'})
+        self.assertEqual(set(tables), {'MCPSERVERS', 'MCPCFGTMPL', 'MCPTOOLTPL'})
         for table in tables:
             self.assertLessEqual(len(table), 10)
             for column in self.db.execute(f'PRAGMA table_info({table})'):
@@ -57,34 +57,34 @@ class SchemaContract(unittest.TestCase):
 
     def test_only_read_tools_can_be_active(self):
         self.tool()
-        self.assertEqual(self.db.execute('SELECT STATE, TOOL_LVL FROM MCPTOOLT').fetchone(), ('D', 'R'))
+        self.assertEqual(self.db.execute('SELECT STATE, TOOL_LVL FROM MCPTOOLTPL').fetchone(), ('D', 'R'))
         for level in ('W', 'D'):
-            self.db.execute('UPDATE MCPTOOLT SET TOOL_LVL=?', (level,))
+            self.db.execute('UPDATE MCPTOOLTPL SET TOOL_LVL=?', (level,))
             with self.assertRaises(sqlite3.IntegrityError):
-                self.db.execute("UPDATE MCPTOOLT SET STATE='A'")
-        self.db.execute("UPDATE MCPTOOLT SET TOOL_LVL='R', STATE='A'")
-        self.db.execute("UPDATE MCPTOOLT SET STATE='X'")
+                self.db.execute("UPDATE MCPTOOLTPL SET STATE='A'")
+        self.db.execute("UPDATE MCPTOOLTPL SET TOOL_LVL='R', STATE='A'")
+        self.db.execute("UPDATE MCPTOOLTPL SET STATE='X'")
         for column in ('STATE', 'TOOL_LVL'):
             with self.assertRaises(sqlite3.IntegrityError):
-                self.db.execute(f"UPDATE MCPTOOLT SET {column}='Q'")
+                self.db.execute(f"UPDATE MCPTOOLTPL SET {column}='Q'")
 
     def test_flat_argument_metadata_round_trips_in_one_row(self):
         args = {}
         for number, kind in enumerate(('string', 'integer', 'boolean'), 1):
             args.update({f'ARG{number}NAME': f'field{number}', f'ARG{number}TYPE': kind, f'ARG{number}REQ': 'Y'})
         self.tool(**args, SCHEMAJSON='{"type":"object"}')
-        self.assertEqual(self.db.execute('SELECT ARG1NAME, ARG2TYPE, ARG3REQ, SCHEMAJSON FROM MCPTOOLT').fetchone(), ('field1', 'integer', 'Y', '{"type":"object"}'))
-        self.db.execute("UPDATE MCPTOOLT SET ARG1TYPE='number'")
+        self.assertEqual(self.db.execute('SELECT ARG1NAME, ARG2TYPE, ARG3REQ, SCHEMAJSON FROM MCPTOOLTPL').fetchone(), ('field1', 'integer', 'Y', '{"type":"object"}'))
+        self.db.execute("UPDATE MCPTOOLTPL SET ARG1TYPE='number'")
         for column, value in [('ARG1TYPE', 'object'), ('ARG2REQ', 'Q')]:
             with self.assertRaises(sqlite3.IntegrityError):
-                self.db.execute(f'UPDATE MCPTOOLT SET {column}=?', (value,))
+                self.db.execute(f'UPDATE MCPTOOLTPL SET {column}=?', (value,))
         with self.assertRaises(sqlite3.IntegrityError):
             self.tool()
 
     def test_config_is_single_row_per_generated_file(self):
-        self.db.execute('INSERT INTO MCPCFGT (CFGID) VALUES (1)')
+        self.db.execute('INSERT INTO MCPCFGTMPL (CFGID) VALUES (1)')
         with self.assertRaises(sqlite3.IntegrityError):
-            self.db.execute('INSERT INTO MCPCFGT (CFGID) VALUES (2)')
+            self.db.execute('INSERT INTO MCPCFGTMPL (CFGID) VALUES (2)')
 
     def test_setup_contains_no_registry_reset(self):
         self.assertNotRegex(self.source.upper(), r'\b(DROP|DELETE|TRUNCATE|REPLACE)\b')

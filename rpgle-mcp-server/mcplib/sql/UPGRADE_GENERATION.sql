@@ -1,7 +1,7 @@
 -- Add handler-generation metadata to an existing MCPLIB installation.
--- Run once before rebuilding MCPTOOLADD. This changes the empty MCPTOOLT
--- template and every registered server's Tnnnnnnn file in place; it does
--- not delete rows or change existing handlers. Re-running is safe.
+-- Run during upgrade before rebuilding MCPTOOLADD. This changes the empty
+-- MCPTOOLTPL template and every registered server's Tnnnnnnn file in place.
+-- It does not delete rows or change existing handlers. Re-running is safe.
 -- IBM i 7.4/7.5 dynamic compound SQL is required by RUNSQLSTM.
 BEGIN
   DECLARE REG_TABLE VARCHAR(10);
@@ -9,12 +9,12 @@ BEGIN
   DECLARE DDL_TEXT VARCHAR(1024);
 
   FOR TOOL_TABLE AS TOOL_CURSOR CURSOR FOR
-    SELECT 'MCPTOOLT' AS REG_NAME FROM SYSIBM.SYSDUMMY1
+    SELECT 'MCPTOOLTPL' AS REG_NAME FROM SYSIBM.SYSDUMMY1
     UNION ALL
     SELECT TRIM(TOOLFILE) AS REG_NAME FROM MCPLIB.MCPSERVERS
   DO
     SET REG_TABLE = REG_NAME;
-    IF REG_TABLE = 'MCPTOOLT' THEN
+    IF REG_TABLE = 'MCPTOOLTPL' THEN
       SET TARGET_CHECK = 'GENTARGET';
     ELSE
       SET TARGET_CHECK = 'G' || SUBSTR(REG_TABLE, 2, 7);

@@ -1,6 +1,6 @@
 -- One-time setup, run with SQL naming after creating library MCPLIB.
 -- Rebuilds must not rerun this file: existing catalog and registry rows survive.
--- MCPCFGT/MCPTOOLT remain empty templates. Create each server's Snnnnnnn /
+-- MCPCFGTMPL/MCPTOOLTPL remain empty templates. Create each server's Snnnnnnn /
 -- Tnnnnnnn tables LIKE these templates INCLUDING COLUMN DEFAULTS; reproduce
 -- the keys and CHECK constraints on generated tables as part of creation.
 -- All object, column, and constraint names fit IBM i's ten-character names.
@@ -18,13 +18,13 @@ CREATE TABLE MCPLIB.MCPSERVERS (
     CHGTS TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE MCPLIB.MCPCFGT (
+CREATE TABLE MCPLIB.MCPCFGTMPL (
     CFGID INTEGER NOT NULL PRIMARY KEY CHECK (CFGID = 1),
     LIBLIST VARCHAR(2750) NOT NULL DEFAULT '',
     TIMEOUT INTEGER NOT NULL DEFAULT 30 CHECK (TIMEOUT BETWEEN 1 AND 3600)
 );
 
-CREATE TABLE MCPLIB.MCPTOOLT (
+CREATE TABLE MCPLIB.MCPTOOLTPL (
     TOOLNAME VARCHAR(64) NOT NULL PRIMARY KEY,
     DESCR VARCHAR(256) NOT NULL,
     HDLLIB CHAR(10) NOT NULL,

@@ -34,7 +34,8 @@ class AdminContract(unittest.TestCase):
 
     def test_created_tables_restore_template_constraints(self):
         s = self.source('rpg/MCPSRVAD.sqlrpgle')
-        for token in ['INCLUDING COLUMN DEFAULTS','PRIMARY KEY (CFGID)', 'CHECK (CFGID = 1 AND TIMEOUT BETWEEN',
+        for token in ['LIKE MCPLIB.MCPCFGTMPL', 'LIKE MCPLIB.MCPTOOLTPL',
+                      'INCLUDING COLUMN DEFAULTS','PRIMARY KEY (CFGID)', 'CHECK (CFGID = 1 AND TIMEOUT BETWEEN',
                       'PRIMARY KEY (TOOLNAME)', "STATE <> ''A'' OR TOOL_LVL = ''R''", 'ARG3REQ',
                       'INSERT INTO MCPLIB.MCPSERVERS', 'DROP TABLE MCPLIB.', 'CRTBY', 'CHGBY']:
             self.assertIn(token, s)
@@ -141,7 +142,7 @@ class GeneratedToolSchema(unittest.TestCase):
         db = sqlite3.connect(':memory:')
         self.addCleanup(db.close)
         db.executescript(ddl)
-        insert = ('INSERT INTO MCPTOOLT '
+        insert = ('INSERT INTO MCPTOOLTPL '
                   '(TOOLNAME, DESCR, HDLLIB, HDLPGM, GENMODE, TGTLIB, TGTPGM) '
                   'VALUES (?, ?, ?, ?, ?, ?, ?)')
         base = ('lookup', 'Lookup', 'MCPLIB', 'WRAPPER')
@@ -152,7 +153,7 @@ class GeneratedToolSchema(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             db.execute(insert, (*base, 'Q', 'APPLIB', 'LOOKUP'))
         db.execute(insert, (*base, 'G', 'APPLIB', 'LOOKUP'))
-        self.assertEqual(db.execute('SELECT STATE FROM MCPTOOLT').fetchone(),
+        self.assertEqual(db.execute('SELECT STATE FROM MCPTOOLTPL').fetchone(),
                          ('D',))
 
 if __name__ == '__main__':

@@ -37,11 +37,12 @@ ensure-library:
 schema: ensure-library
 	$(SYSTEM) "RUNSQLSTM SRCSTMF('$(SRCROOT)/sql/SCHEMA.sql') COMMIT(*NONE) NAMING(*SQL)"
 
-# Rename the shared server registry in place. The SQL also succeeds when the
-# new name already exists, but stops if both or neither table exists.
+# Rename the shared server registry and templates in place. Each script
+# accepts already-renamed tables, but stops on missing or ambiguous pairs.
 # Keep this target out of the fresh-install schema/app dependency chain.
 upgrade-catalog: ensure-library
 	$(SYSTEM) "RUNSQLSTM SRCSTMF('$(SRCROOT)/sql/RENAME_SERVERS.sql') COMMIT(*NONE) NAMING(*SQL) ERRLVL(10)"
+	$(SYSTEM) "RUNSQLSTM SRCSTMF('$(SRCROOT)/sql/RENAME_TEMPLATES.sql') COMMIT(*NONE) NAMING(*SQL) ERRLVL(10)"
 
 # Add generation metadata in place to an older installation. Rename the
 # catalog first because the column upgrade reads the per-server tool files
@@ -51,8 +52,8 @@ upgrade-generation: upgrade-catalog verify-schema
 
 verify-schema: ensure-library
 	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPSERVERS) OBJTYPE(*FILE)"
-	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPCFGT) OBJTYPE(*FILE)"
-	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPTOOLT) OBJTYPE(*FILE)"
+	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPCFGTMPL) OBJTYPE(*FILE)"
+	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPTOOLTPL) OBJTYPE(*FILE)"
 
 # Display-file creation requires DDS in a source physical file. Copying DDS
 # source members does not touch the three SQL data files or generated rows.
