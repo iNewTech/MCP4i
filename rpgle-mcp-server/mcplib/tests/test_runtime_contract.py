@@ -41,7 +41,7 @@ class RuntimeContract(unittest.TestCase):
         self.assertRegex(source, r"(?i)requestedTool\s+varchar\(64\)\s+const")
 
     def test_handler_programs_use_fixed_four_argument_abi(self):
-        for name in ("MCSYSINF.sqlrpgle", "MCLIBLST.sqlrpgle"):
+        for name in ("MCSYSINF.sqlrpgle", "MCPLIBLIST.sqlrpgle"):
             with self.subTest(name=name):
                 source = (RPG / name).read_text()
                 self.assertRegex(source, r"(?i)argsJson\s+char\(8192\)")

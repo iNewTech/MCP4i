@@ -39,7 +39,7 @@
 
 ### Task 2: CGI registry and independent handler programs
 
-**Files:** `mcplib/rpg/MCPHTTP.sqlrpgle`, `MCPREG.sqlrpgle`, `MCPJSON.sqlrpgle`, `MCSYSINF.sqlrpgle`, `MCLIBLST.sqlrpgle`, `mcplib/copy/MCPABI.rpgleinc`, test file.
+**Files:** `mcplib/rpg/MCPHTTP.sqlrpgle`, `MCPREG.sqlrpgle`, `MCPJSON.sqlrpgle`, `MCSYSINF.sqlrpgle`, `MCPLIBLIST.sqlrpgle`, `mcplib/copy/MCPABI.rpgleinc`, test file.
 
 **Interfaces:** `MCPREG` exports `resolveServer`, `listRegisteredTools`, and `callRegisteredTool`; handlers use four by-reference arguments (8192, 8192, int32, int32).
 
