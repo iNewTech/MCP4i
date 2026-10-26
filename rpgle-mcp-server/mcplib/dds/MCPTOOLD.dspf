@@ -1,0 +1,40 @@
+     A                                      DSPSIZ(*DS4)
+     A                                      CA03(03)
+     A          R TOOLREC
+     A            ERRMSG       100A  O  1  2
+     A            TNAME         64A  B  2 20CHECK(LC)
+     A                                  2  2'Tool name'
+     A            TDESC        128A  B  4  2CHECK(LC)
+     A                                  3  2'Description'
+     A            GMODE          1A  B  6  2
+     A                                  5  2'M=manual G=generate T=template'
+     A            TLIB          10A  B  6 42
+     A                                  5 42'Target library'
+     A            TPGM          10A  B  6 62
+     A                                  5 62'Target program'
+     A            HLIB          10A  B  8  2
+     A                                  7  2'Handler library'
+     A            HPGM          10A  B 10  2
+     A                                  9  2'Handler program'
+     A            TLVL           1A  B 12  2
+     A                                 11  2'Capability R/W/D'
+     A            TSTATE         1A  B 14  2
+     A                                 13  2'State D=draft A=publish X=retired'
+     A            AN1          128A  B 16  2CHECK(LC)
+     A                                 15  2'Argument 1 name'
+     A            AT1            7A  B 18  2CHECK(LC)
+     A                                 17  2'Type'
+     A            AR1            1A  B 18 20
+     A                                 17 20'Required Y/N'
+     A            AN2          128A  B 20  2CHECK(LC)
+     A                                 19  2'Argument 2 name'
+     A            AT2            7A  B 22  2CHECK(LC)
+     A                                 21  2'Type'
+     A            AR2            1A  B 22 20
+     A                                 21 20'Required Y/N'
+     A            AN3          128A  B 24  2CHECK(LC)
+     A                                 23  2'Argument 3 name'
+     A            AT3            7A  B 26  2CHECK(LC)
+     A                                 25  2'Type'
+     A            AR3            1A  B 26 20
+     A                                 25 20'Required Y/N'

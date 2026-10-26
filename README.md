@@ -6,7 +6,7 @@ The project connects AI concepts to familiar IBM i work: inspecting libraries an
 
 New to the project? Read the [MCP4i article for IBM i developers](docs/blog-mcp4i-for-ibmi-developers.md) for the motivation, repository map, and ways to try it.
 
-**Current stage:** Lessons 1–10, Python and TypeScript CLI starters, and a completed Python document demo are available. The CLIs use local Ollama. A two-tool RPGLE MCP server with separately bound tool modules is now in source form; IBM i compilation and a live connection remain unverified.
+**Current stage:** Lessons 1–10, Python and TypeScript CLI starters, and a completed Python document demo are available. The CLIs use local Ollama. The RPGLE single-server tutorial and a new `MCPLIB` multi-server application are in source form; IBM i compilation and a live connection remain unverified.
 
 ## Start learning
 
@@ -37,7 +37,9 @@ For the [TypeScript CLI starter](cli_project_ts/README.md), use Node.js 22.19+ a
 
 ## Build the RPGLE MCP server
 
-The [RPGLE MCP server guide](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/README.md) explains the IBM i library, compile and bind commands, dedicated job queue and subsystem, HTTP instance, start/stop commands, and live smoke test. [MCPHTTP.sqlrpgle](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/MCPHTTP.sqlrpgle) handles CGI and registers two read-only tools, each implemented in its own bound RPG module: `get_system_info` and `get_library_list`. Its [HTTP configuration](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/httpd.conf.example) and [smoke test](https://github.com/iNewTech/MCP4i/blob/main/rpgle-mcp-server/smoke_test.py) are separate files. This slice has not yet been compiled or tested on a real IBM i partition.
+For the new configurable application, start with the [MCPLIB guide](rpgle-mcp-server/mcplib/README.md). It maps IFS source to IBM i objects, shows the one-time schema and repeatable IFS/CL builds, and explains the DDS commands for servers and tools. It also shows how to generate a reviewed MCP handler around an existing read-only IBM i program or start from an editable template. HTTP instance provisioning is the next milestone.
+
+The [RPGLE MCP server guide](rpgle-mcp-server/README.md) explains the IBM i library, compile and bind commands, dedicated job queue and subsystem, HTTP instance, start/stop commands, and live smoke test. [MCPHTTP.sqlrpgle](rpgle-mcp-server/MCPHTTP.sqlrpgle) handles CGI and registers two read-only tools, each implemented in its own bound RPG module: `get_system_info` and `get_library_list`. Its [HTTP configuration](rpgle-mcp-server/httpd.conf.example) and [smoke test](rpgle-mcp-server/smoke_test.py) are separate files. This slice has not yet been compiled or tested on a real IBM i partition.
 
 ## How this bootcamp works
 
@@ -74,7 +76,7 @@ You can complete the first two lessons without an IBM i connection, credentials,
 
 ## Phase 1 boundary
 
-Expose read-only capabilities. Exclude data changes, arbitrary CL commands, program execution, and job submission or control. `run_sql` is a later, restricted SELECT-only capability whose complete query and dependencies must be checked; a SELECT prefix alone is insufficient.
+Expose read-only capabilities. Exclude data changes, arbitrary CL commands, unrestricted program execution, and job submission or control. A reviewed program that only reads data can be exposed through a dedicated handler; publishing it still requires checking its behavior and authority. `run_sql` is a later, restricted SELECT-only capability whose complete query and dependencies must be checked; a SELECT prefix alone is insufficient.
 
 The [Phase 1 roadmap](project/phase-01-readonly-tools.md) is the source of truth for tool names, scope, limits, and deferred capabilities.
 
@@ -109,6 +111,7 @@ MCP4i/
 │   └── README.md (TypeScript counterpart to the starter)
 └── rpgle-mcp-server/
     ├── README.md (deploy, compile, start, and verify)
+    ├── mcplib/ (configurable multi-server application and IFS/CL builds)
     ├── MCPHTTP.sqlrpgle (CGI entry and tool registry)
     ├── SYSINFO.sqlrpgle (system-information tool module)
     ├── LIBLIST.sqlrpgle (library-list tool module)

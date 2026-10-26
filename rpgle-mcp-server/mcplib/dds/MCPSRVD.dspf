@@ -1,0 +1,17 @@
+     A                                      DSPSIZ(*DS4)
+     A                                      CA03(03)
+     A          R SRVREC
+     A                                  1  2'MCPLIB: Enter saves, F3 cancels'
+     A            SNAME         64A  B  4  2CHECK(LC)
+     A                                  3  2'Display name'
+     A            SPORT          5Y 0B  6  2
+     A                                  5  2'Port (1024-65535)'
+     A            SMAX           1A  B  8  2
+     A                                  7  2'Maximum capability R/W/D'
+     A            SSTATE         1A  B 10  2
+     A                                  9  2'State D=draft A=active X=retired'
+     A            SLIBL        128A  B 12  2
+     A                                 11  2'Library list (128 char limit)'
+     A            STIME          4Y 0B 16  2
+     A                                 15  2'Timeout seconds (1-3600)'
+     A            ERRMSG       100A  O 24  2
