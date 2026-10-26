@@ -22,7 +22,7 @@ class AdminContract(unittest.TestCase):
                 self.assertIn('LEN(10)', s)
 
     def test_screens_and_programs_agree(self):
-        for screen, program, record in [('MCPSRVD','MCPSRVAD','SRVREC'),('MCPTOOLD','MCPTOOAD','TOOLREC')]:
+        for screen, program, record in [('MCPSRVD','MCPSRVAD','SRVREC'),('MCPTOOLD','MCPTOOLADD','TOOLREC')]:
             dds = self.source(f'dds/{screen}.dspf')
             rpg = self.source(f'rpg/{program}.sqlrpgle')
             self.assertIn(f'R {record}', dds)
@@ -40,7 +40,7 @@ class AdminContract(unittest.TestCase):
             self.assertIn(token, s)
 
     def test_tool_write_is_parameterized_and_soft_retire(self):
-        s = self.source('rpg/MCPTOOAD.sqlrpgle')
+        s = self.source('rpg/MCPTOOLADD.sqlrpgle')
         self.assertIn("SET STATE = ''X''", s)
         self.assertNotIn('DELETE FROM', s)
         self.assertIn("TSTATE = 'A' and TLVL <> 'R'", s)
@@ -72,7 +72,7 @@ class AdminBounds(unittest.TestCase):
         self.assertIn('CHAR(CHGTS)=:loadedTs', source)
 
     def test_tool_edit_uses_optimistic_version(self):
-        source = (ROOT / 'rpg/MCPTOOAD.sqlrpgle').read_text()
+        source = (ROOT / 'rpg/MCPTOOLADD.sqlrpgle').read_text()
         self.assertIn('CHAR(CHGTS)=?', source)
         self.assertIn(':toolName, :loadedTs', source)
 
@@ -89,7 +89,7 @@ class AdminBounds(unittest.TestCase):
                         self.assertLessEqual(column + width - 1, 132)
 
     def test_schema_total_is_checked_before_assignment(self):
-        source = (ROOT / 'rpg/MCPTOOAD.sqlrpgle').read_text()
+        source = (ROOT / 'rpg/MCPTOOLADD.sqlrpgle').read_text()
         guard = '%len(properties) + %len(requiredList) + 80 > 2048'
         self.assertIn(guard, source)
         self.assertLess(source.index(guard), source.index("schemaJson = '{"))
@@ -113,7 +113,7 @@ class AdminDdsTypes(unittest.TestCase):
         import re
         command = (ROOT / 'cmd/ADDMCPTOOL.cmd').read_text()
         dds = (ROOT / 'dds/MCPTOOLD.dspf').read_text()
-        program = (ROOT / 'rpg/MCPTOOAD.sqlrpgle').read_text()
+        program = (ROOT / 'rpg/MCPTOOLADD.sqlrpgle').read_text()
         self.assertRegex(command, r'(?s)KWD\(TOOL\).*?MIN\(0\)')
         self.assertRegex(dds, r'(?m)^.*\bTNAME\s+64A\s+B\s+2\s+20CHECK\(LC\)')
         self.assertIn('TNAME = toolName;', program)

@@ -48,9 +48,9 @@
 
 ### Task 3: DDS administration commands
 
-**Files:** `mcplib/dds/MCPSRVD.dspf`, `MCPTOOLD.dspf`, `mcplib/rpg/MCPSRVAD.sqlrpgle`, `MCPTOOAD.sqlrpgle`, `MCPSRVOP.sqlrpgle`, `mcplib/cmd/*.cmd`, test file.
+**Files:** `mcplib/dds/MCPSRVD.dspf`, `MCPTOOLD.dspf`, `mcplib/rpg/MCPSRVAD.sqlrpgle`, `MCPTOOLADD.sqlrpgle`, `MCPSRVOP.sqlrpgle`, `mcplib/cmd/*.cmd`, test file.
 
-**Interfaces:** `CRTMCPSRV` and `CHGMCPSRV` invoke `MCPSRVAD`; `ADDMCPTOOL`, `EDTMCPTOOL`, and `RMVMCPTOOL` invoke `MCPTOOAD`; `STRMCPSRV` and `ENDMCPSRV` invoke `MCPSRVOP`.
+**Interfaces:** `CRTMCPSRV` and `CHGMCPSRV` invoke `MCPSRVAD`; `ADDMCPTOOL`, `EDTMCPTOOL`, and `RMVMCPTOOL` invoke `MCPTOOLADD`; `STRMCPSRV` and `ENDMCPSRV` invoke `MCPSRVOP`.
 
 - [x] Write tests for the seven command definitions and DDS object wiring; run them red.
 - [x] Implement validation, per-server file creation, one-row tool registration, activation/retirement, and start/stop wrappers; run the tests green.

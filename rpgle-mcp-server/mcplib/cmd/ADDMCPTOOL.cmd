@@ -1,4 +1,4 @@
-/* CPP: MCPLIB/MCPTOOAD; parameter order MODE, SERVER, TOOL */
+/* CPP: MCPLIB/MCPTOOLADD; parameter order MODE, SERVER, TOOL */
              CMD        PROMPT('ADDMCPTOOL')
              PARM       KWD(MODE) TYPE(*CHAR) LEN(1) CONSTANT('A')
              PARM       KWD(SERVER) TYPE(*CHAR) LEN(10) MIN(1) +

@@ -1,5 +1,5 @@
 -- Add handler-generation metadata to an existing MCPLIB installation.
--- Run once before rebuilding MCPTOOAD. This changes the empty MCPTOOLT
+-- Run once before rebuilding MCPTOOLADD. This changes the empty MCPTOOLT
 -- template and every registered server's Tnnnnnnn file in place; it does
 -- not delete rows or change existing handlers. Re-running is safe.
 -- IBM i 7.4/7.5 dynamic compound SQL is required by RUNSQLSTM.

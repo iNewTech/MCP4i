@@ -10,7 +10,7 @@ This milestone supplies source, DDS administration screens, two sample read-only
 | --- | --- | --- |
 | [sql/SCHEMA.sql](sql/SCHEMA.sql), [sql/UPGRADE_GENERATION.sql](sql/UPGRADE_GENERATION.sql) | `MCPCAT`, `MCPCFGT`, `MCPTOOLT` `*FILE` | One-time catalog/templates and an additive upgrade for existing tool tables. `CRTMCPSRV` allocates per-server `Snnnnnnn` and `Tnnnnnnn` files. |
 | [dds/MCPSRVD.dspf](dds/MCPSRVD.dspf), [dds/MCPTOOLD.dspf](dds/MCPTOOLD.dspf) | `MCPSRVD`, `MCPTOOLD` `*DSPF` | 5250 screens for server and tool details. DDS is copied to `MCPLIB/QDDSSRC` before compilation. |
-| [rpg/MCPSRVAD.sqlrpgle](rpg/MCPSRVAD.sqlrpgle), [rpg/MCPTOOAD.sqlrpgle](rpg/MCPTOOAD.sqlrpgle) | `MCPSRVAD`, `MCPTOOAD` `*PGM` | Validate the screen input and save server/tool rows. |
+| [rpg/MCPSRVAD.sqlrpgle](rpg/MCPSRVAD.sqlrpgle), [rpg/MCPTOOLADD.sqlrpgle](rpg/MCPTOOLADD.sqlrpgle) | `MCPSRVAD`, `MCPTOOLADD` `*PGM` | Validate screen input and save server/tool rows. `MCPTOOLADD` handles add, edit, and retire commands. |
 | [rpg/MCPSRVOP.sqlrpgle](rpg/MCPSRVOP.sqlrpgle) | `MCPSRVOP` `*PGM` | Start/end wrapper; rejects an unprovisioned HTTP instance. |
 | [rpg/MCPHTTP.sqlrpgle](rpg/MCPHTTP.sqlrpgle), [rpg/MCPREG.sqlrpgle](rpg/MCPREG.sqlrpgle), [rpg/MCPJSON.sqlrpgle](rpg/MCPJSON.sqlrpgle) | `MCPHTTP` `*PGM` and modules | CGI request handling, per-server tool lookup, and JSON response creation. |
 | [rpg/MCSYSINF.sqlrpgle](rpg/MCSYSINF.sqlrpgle), [rpg/MCPLIBLIST.sqlrpgle](rpg/MCPLIBLIST.sqlrpgle) | `MCSYSINF`, `MCPLIBLIST` `*PGM` | Independent sample handlers for `get_system_info` and `get_library_list`. |

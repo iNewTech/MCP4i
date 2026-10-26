@@ -1,4 +1,6 @@
 **free
+// Shared command processing program for ADDMCPTOOL, EDTMCPTOOL, and
+// RMVMCPTOOL. The command's MODE parameter chooses add, edit, or retire.
 ctl-opt dftactgrp(*no) actgrp(*new) option(*srcstmt:*nodebugio);
 dcl-f MCPTOOLD workstn usropn extdesc('MCPLIB/MCPTOOLD')
   extfile('MCPLIB/MCPTOOLD');
