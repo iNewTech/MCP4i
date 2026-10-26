@@ -22,7 +22,7 @@ class SchemaContract(unittest.TestCase):
         row = dict(SRVID='SERVER1', DISPNAME='First server', PORT=8080,
                    CFGFILE='S0000001', TOOLFILE='T0000001')
         row.update(values)
-        self.db.execute(f"INSERT INTO MCPCAT ({','.join(row)}) VALUES ({','.join('?' for _ in row)})", tuple(row.values()))
+        self.db.execute(f"INSERT INTO MCPSERVERS ({','.join(row)}) VALUES ({','.join('?' for _ in row)})", tuple(row.values()))
 
     def tool(self, **values):
         row = dict(TOOLNAME='get_info', DESCR='Reviewed handler', HDLLIB='MCPLIB', HDLPGM='MCPINFO')
@@ -31,7 +31,7 @@ class SchemaContract(unittest.TestCase):
 
     def test_system_identifiers_fit_ibm_i_and_templates_start_empty(self):
         tables = [row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-        self.assertEqual(set(tables), {'MCPCAT', 'MCPCFGT', 'MCPTOOLT'})
+        self.assertEqual(set(tables), {'MCPSERVERS', 'MCPCFGT', 'MCPTOOLT'})
         for table in tables:
             self.assertLessEqual(len(table), 10)
             for column in self.db.execute(f'PRAGMA table_info({table})'):
@@ -46,14 +46,14 @@ class SchemaContract(unittest.TestCase):
             with self.subTest(duplicate=duplicate), self.assertRaises(sqlite3.IntegrityError):
                 self.server(**(dict(SRVID='SERVER2', PORT=8081, CFGFILE='S0000002', TOOLFILE='T0000002') | duplicate))
         self.server(SRVID='SERVER2', PORT=8081, CFGFILE='S0000002', TOOLFILE='T0000002')
-        self.assertEqual(self.db.execute('SELECT CFGFILE, TOOLFILE FROM MCPCAT WHERE SRVID=?', ('SERVER2',)).fetchone(), ('S0000002', 'T0000002'))
+        self.assertEqual(self.db.execute('SELECT CFGFILE, TOOLFILE FROM MCPSERVERS WHERE SRVID=?', ('SERVER2',)).fetchone(), ('S0000002', 'T0000002'))
 
     def test_server_defaults_to_draft_and_rejects_bad_states_and_ports(self):
         self.server()
-        self.assertEqual(self.db.execute('SELECT STATE, MAXLVL FROM MCPCAT').fetchone(), ('D', 'R'))
+        self.assertEqual(self.db.execute('SELECT STATE, MAXLVL FROM MCPSERVERS').fetchone(), ('D', 'R'))
         for column, value in [('STATE', 'Q'), ('MAXLVL', 'Q'), ('PORT', 0), ('PORT', 65536)]:
             with self.subTest(column=column, value=value), self.assertRaises(sqlite3.IntegrityError):
-                self.db.execute(f'UPDATE MCPCAT SET {column}=?', (value,))
+                self.db.execute(f'UPDATE MCPSERVERS SET {column}=?', (value,))
 
     def test_only_read_tools_can_be_active(self):
         self.tool()

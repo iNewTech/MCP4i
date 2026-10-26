@@ -54,7 +54,7 @@ dcl-proc resolveServer export;
   exec sql
     select DISPNAME, TOOLFILE, MAXLVL
       into :displayName, :toolTable, :maxLevel
-      from MCPLIB.MCPCAT
+      from MCPLIB.MCPSERVERS
      where SRVID = :serverId and STATE = 'A';
   if sqlcode <> 0 or not validToolTable(toolTable);
     return *off;

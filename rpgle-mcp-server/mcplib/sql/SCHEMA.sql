@@ -4,7 +4,7 @@
 -- Tnnnnnnn tables LIKE these templates INCLUDING COLUMN DEFAULTS; reproduce
 -- the keys and CHECK constraints on generated tables as part of creation.
 -- All object, column, and constraint names fit IBM i's ten-character names.
-CREATE TABLE MCPLIB.MCPCAT (
+CREATE TABLE MCPLIB.MCPSERVERS (
     SRVID CHAR(10) NOT NULL PRIMARY KEY,
     DISPNAME VARCHAR(64) NOT NULL,
     PORT INTEGER NOT NULL UNIQUE CHECK (PORT BETWEEN 1024 AND 65535),

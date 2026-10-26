@@ -53,7 +53,7 @@ if not validName(serverId) or
   *inlr = *on;
   return;
 endif;
-exec sql select TOOLFILE into :tableName from MCPLIB.MCPCAT
+exec sql select TOOLFILE into :tableName from MCPLIB.MCPSERVERS
   where SRVID = :serverId and STATE <> 'X';
 if sqlcode <> 0 or %len(%trim(tableName)) <> 8 or
    %subst(tableName:1:1) <> 'T' or

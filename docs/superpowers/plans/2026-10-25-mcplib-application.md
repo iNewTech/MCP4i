@@ -32,7 +32,7 @@
 
 **Files:** `rpgle-mcp-server/mcplib/sql/SCHEMA.sql`, `rpgle-mcp-server/mcplib/tests/test_source_contract.py`
 
-**Interfaces:** `MCPCAT` maps `SRVID` to `CFGFILE` and `TOOLFILE`; `MCPCFGT` and `MCPTOOLT` are empty table templates.
+**Interfaces:** `MCPSERVERS` maps `SRVID` to `CFGFILE` and `TOOLFILE`; `MCPCFGT` and `MCPTOOLT` are empty table templates.
 
 - [x] Write source-contract tests for object names, uniqueness, states, and per-server file mapping; run them red.
 - [x] Create the DDL with one-time setup semantics; run the tests green.

@@ -24,6 +24,7 @@ class BuildContract(unittest.TestCase):
             ["make", "-n", "-C", str(ROOT), "app"], text=True
         )
         self.assertNotIn("RUNSQLSTM", output)
+        self.assertIn("CHKOBJ OBJ(MCPLIB/MCPSERVERS)", output)
         order = [
             "CRTDSPF FILE(MCPLIB/MCPSRVD)",
             "CRTDSPF FILE(MCPLIB/MCPTOOLD)",
@@ -40,6 +41,7 @@ class BuildContract(unittest.TestCase):
         )
         self.assertIn("RUNSQLSTM SRCSTMF(", output)
         self.assertIn("SCHEMA.sql", output)
+        self.assertNotIn("RENAME_SERVERS.sql", output)
 
     def test_handler_target_builds_one_reviewed_wrapper_without_schema(self):
         output = subprocess.check_output(
@@ -60,11 +62,25 @@ class BuildContract(unittest.TestCase):
             ["make", "-n", "-C", str(ROOT), "upgrade-generation"],
             text=True,
         )
+        self.assertIn("RENAME_SERVERS.sql", output)
+        self.assertIn("NAMING(*SQL) ERRLVL(10)", output)
         self.assertIn("UPGRADE_GENERATION.sql", output)
+        self.assertLess(
+            output.index("RENAME_SERVERS.sql"),
+            output.index("UPGRADE_GENERATION.sql"),
+        )
+        self.assertIn("CHKOBJ OBJ(MCPLIB/MCPSERVERS)", output)
         self.assertNotIn("SCHEMA.sql", output)
         driver = (ROOT / "cl" / "BLDMCPLIB.clle").read_text()
         self.assertIn("IF COND(&MODE *EQ 'UPGRADE')", driver)
+        self.assertIn("'/sql/RENAME_SERVERS.sql'", driver)
+        self.assertIn("NAMING(*SQL) +\n      ERRLVL(10)", driver)
         self.assertIn("'/sql/UPGRADE_GENERATION.sql'", driver)
+        self.assertLess(
+            driver.index("'/sql/RENAME_SERVERS.sql'"),
+            driver.index("'/sql/UPGRADE_GENERATION.sql'"),
+        )
+        self.assertIn("CHKOBJ OBJ(MCPLIB/MCPSERVERS)", driver)
 
     def test_cl_driver_compiles_same_commands_and_preserves_schema(self):
         source = (ROOT / "cl" / "BLDMCPLIB.clle").read_text()

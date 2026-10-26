@@ -20,7 +20,7 @@ if serverId = '' or
   *inlr = *on;
   return;
 endif;
-exec sql select STATE into :serverState from MCPLIB.MCPCAT
+exec sql select STATE into :serverState from MCPLIB.MCPSERVERS
   where SRVID = :serverId;
 if sqlcode <> 0;
   dsply 'Server not found or catalog unavailable.';

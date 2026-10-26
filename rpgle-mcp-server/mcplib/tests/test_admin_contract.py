@@ -36,7 +36,7 @@ class AdminContract(unittest.TestCase):
         s = self.source('rpg/MCPSRVAD.sqlrpgle')
         for token in ['INCLUDING COLUMN DEFAULTS','PRIMARY KEY (CFGID)', 'CHECK (CFGID = 1 AND TIMEOUT BETWEEN',
                       'PRIMARY KEY (TOOLNAME)', "STATE <> ''A'' OR TOOL_LVL = ''R''", 'ARG3REQ',
-                      'INSERT INTO MCPLIB.MCPCAT', 'DROP TABLE MCPLIB.', 'CRTBY', 'CHGBY']:
+                      'INSERT INTO MCPLIB.MCPSERVERS', 'DROP TABLE MCPLIB.', 'CRTBY', 'CHGBY']:
             self.assertIn(token, s)
 
     def test_tool_write_is_parameterized_and_soft_retire(self):
@@ -66,7 +66,7 @@ class AdminBounds(unittest.TestCase):
     def test_catalog_lock_is_not_held_during_screen_input(self):
         source = (ROOT / 'rpg/MCPSRVAD.sqlrpgle').read_text()
         self.assertLess(source.index('exfmt SRVREC'),
-                        source.index("sqlText = 'ALCOBJ OBJ((MCPLIB/MCPCAT"))
+                        source.index("sqlText = 'ALCOBJ OBJ((MCPLIB/MCPSERVERS"))
         self.assertIn('dcl-s serial int(10)', source)
         self.assertIn('cfgMade = *off; toolMade = *off;', source)
         self.assertIn('CHAR(CHGTS)=:loadedTs', source)

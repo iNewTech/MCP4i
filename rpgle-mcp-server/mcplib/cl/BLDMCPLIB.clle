@@ -1,5 +1,5 @@
 /* ILE CL build driver for source already copied into the IBM i IFS.      */
-/* SCHEMA creates files once; UPGRADE adds tool columns to old installs.   */
+/* SCHEMA creates files once; UPGRADE renames the catalog and adds columns. */
 /* APP rebuilds code only. Never use SCHEMA to upgrade an installation.   */
 /* Customer MCP wrappers are compiled separately after source review.    */
 /* SRCROOT is the absolute IFS path to this mcplib directory, no slash.  */
@@ -27,9 +27,14 @@ PGM PARM(&MODE &SRCROOT)
   ENDDO
 
   IF COND(&MODE *EQ 'UPGRADE') THEN(DO)
-    /* Add columns to MCPTOOLT and existing Tnnnnnnn files in place. */
-    CHKOBJ OBJ(MCPLIB/MCPCAT) OBJTYPE(*FILE)
+    /* Rename the shared catalog before the generation upgrade reads it. */
+    /* Stop HTTP and 5250 administration traffic before this mode. */
     CHKOBJ OBJ(MCPLIB/MCPTOOLT) OBJTYPE(*FILE)
+    CHGVAR VAR(&STMF) VALUE(&SRCROOT *TCAT '/sql/RENAME_SERVERS.sql')
+    RUNSQLSTM SRCSTMF(&STMF) COMMIT(*NONE) NAMING(*SQL) +
+      ERRLVL(10)
+    CHKOBJ OBJ(MCPLIB/MCPSERVERS) OBJTYPE(*FILE)
+    /* Add columns to MCPTOOLT and existing Tnnnnnnn files in place. */
     CHGVAR VAR(&STMF) VALUE(&SRCROOT *TCAT '/sql/UPGRADE_GENERATION.sql')
     RUNSQLSTM SRCSTMF(&STMF) COMMIT(*NONE) NAMING(*SQL)
     RETURN
@@ -41,7 +46,7 @@ PGM PARM(&MODE &SRCROOT)
   ENDDO
 
   /* Static SQL in the administrative programs needs these data files. */
-  CHKOBJ OBJ(MCPLIB/MCPCAT) OBJTYPE(*FILE)
+  CHKOBJ OBJ(MCPLIB/MCPSERVERS) OBJTYPE(*FILE)
   CHKOBJ OBJ(MCPLIB/MCPCFGT) OBJTYPE(*FILE)
   CHKOBJ OBJ(MCPLIB/MCPTOOLT) OBJTYPE(*FILE)
 

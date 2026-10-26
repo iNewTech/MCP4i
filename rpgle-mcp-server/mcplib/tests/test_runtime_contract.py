@@ -33,7 +33,7 @@ class RuntimeContract(unittest.TestCase):
 
     def test_registry_never_uses_client_text_as_program_or_table_name(self):
         source = (RPG / "MCPREG.sqlrpgle").read_text()
-        self.assertIn("MCPLIB.MCPCAT", source)
+        self.assertIn("MCPLIB.MCPSERVERS", source)
         self.assertIn("TOOLFILE", source)
         self.assertIn("STATE = 'A'", source)
         self.assertIn("TOOL_LVL = ''R''", source)

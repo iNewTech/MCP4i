@@ -7,12 +7,12 @@ SRCROOT ?= $(CURDIR)
 SYSTEM ?= system -K
 RPGOPT = COMPILEOPT('INCDIR(''$(SRCROOT)/copy'')')
 
-.PHONY: help schema upgrade-generation app handler ensure-library verify-schema dds-source displays modules programs commands check
+.PHONY: help schema upgrade-catalog upgrade-generation app handler ensure-library verify-schema dds-source displays modules programs commands check
 .NOTPARALLEL:
 
 help:
 	@echo 'IBM i PASE: make schema (once), then make app (repeatable)'
-	@echo 'Existing installation only: make upgrade-generation before make app'
+	@echo 'Existing installation: stop HTTP/admin traffic, make upgrade-generation, make app, then restart'
 	@echo 'One generated tool: make handler HANDLER_SRC=/absolute/path/TOOL.sqlrpgle HANDLER_PGM=TOOL [HANDLER_LIB=MCPLIB]'
 	@echo 'Developer workstation: make check; make -n app previews CL commands'
 
@@ -37,14 +37,20 @@ ensure-library:
 schema: ensure-library
 	$(SYSTEM) "RUNSQLSTM SRCSTMF('$(SRCROOT)/sql/SCHEMA.sql') COMMIT(*NONE) NAMING(*SQL)"
 
-# Add generation metadata in place to an installation created before these
-# columns existed. The SQL guards each ALTER and retains every registry row.
-# Do not run `schema` again against an existing installation.
-upgrade-generation: verify-schema
+# Rename the shared server registry in place. The SQL also succeeds when the
+# new name already exists, but stops if both or neither table exists.
+# Keep this target out of the fresh-install schema/app dependency chain.
+upgrade-catalog: ensure-library
+	$(SYSTEM) "RUNSQLSTM SRCSTMF('$(SRCROOT)/sql/RENAME_SERVERS.sql') COMMIT(*NONE) NAMING(*SQL) ERRLVL(10)"
+
+# Add generation metadata in place to an older installation. Rename the
+# catalog first because the column upgrade reads the per-server tool files
+# from MCPSERVERS. Do not run `schema` again against an existing installation.
+upgrade-generation: upgrade-catalog verify-schema
 	$(SYSTEM) "RUNSQLSTM SRCSTMF('$(SRCROOT)/sql/UPGRADE_GENERATION.sql') COMMIT(*NONE) NAMING(*SQL)"
 
 verify-schema: ensure-library
-	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPCAT) OBJTYPE(*FILE)"
+	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPSERVERS) OBJTYPE(*FILE)"
 	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPCFGT) OBJTYPE(*FILE)"
 	$(SYSTEM) "CHKOBJ OBJ($(LIB)/MCPTOOLT) OBJTYPE(*FILE)"
 

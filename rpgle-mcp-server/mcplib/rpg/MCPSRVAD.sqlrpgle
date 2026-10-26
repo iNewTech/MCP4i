@@ -41,7 +41,7 @@ if mode = 'E';
     CHAR(CHGTS)
     into :SNAME, :SPORT, :SMAX, :SSTATE, :cfgFile, :toolFile,
          :loadedTs
-    from MCPLIB.MCPCAT where SRVID = :serverId;
+    from MCPLIB.MCPSERVERS where SRVID = :serverId;
   ok = sqlcode = 0;
   if ok;
     ok = %len(%trim(cfgFile)) = 8 and %subst(cfgFile:1:1) = 'S' and
@@ -91,7 +91,7 @@ dow *on;
   portNumber = SPORT; timeLimit = STIME;
   // Lock only during the save. The user may spend minutes on EXFMT; holding
   // the catalog lock while waiting would block other administrators.
-  sqlText = 'ALCOBJ OBJ((MCPLIB/MCPCAT *FILE *EXCLRD)) WAIT(0)';
+  sqlText = 'ALCOBJ OBJ((MCPLIB/MCPSERVERS *FILE *EXCLRD)) WAIT(0)';
   exec sql call QSYS2.QCMDEXC(:sqlText);
   if sqlcode <> 0;
     ERRMSG = 'Catalog busy or unavailable. Retry later.';
@@ -103,7 +103,7 @@ dow *on;
     cfgMade = *off; toolMade = *off;
     // Catalog lock prevents allocation races between these command programs.
     exec sql select coalesce(max(integer(substr(CFGFILE,2,7))),0) + 1
-      into :serial from MCPLIB.MCPCAT;
+      into :serial from MCPLIB.MCPSERVERS;
     if sqlcode <> 0 or serial > 9999999;
       ERRMSG = 'Cannot allocate a server table number.';
       exsr unlock;
@@ -167,7 +167,7 @@ dow *on;
       endif;
     endif;
     if ok;
-      exec sql INSERT INTO MCPLIB.MCPCAT
+      exec sql INSERT INTO MCPLIB.MCPSERVERS
         (SRVID, DISPNAME, PORT, CFGFILE, TOOLFILE, MAXLVL, STATE, CRTBY, CHGBY)
         values (:serverId, :displayName, :portNumber, :cfgFile, :toolFile,
                 :SMAX, 'D', CURRENT_USER, CURRENT_USER);
@@ -218,7 +218,7 @@ dow *on;
       ok = sqlcode = 0 and sqlerrd(3) = 1;
     endif;
     if ok;
-      exec sql update MCPLIB.MCPCAT set DISPNAME=:displayName,
+      exec sql update MCPLIB.MCPSERVERS set DISPNAME=:displayName,
         PORT=:portNumber, MAXLVL=:SMAX, STATE=:SSTATE,
         CHGBY=CURRENT_USER, CHGTS=CURRENT_TIMESTAMP
         where SRVID=:serverId and CHAR(CHGTS)=:loadedTs;
@@ -248,7 +248,7 @@ exsr unlock;
 return;
 begsr unlock;
   if lockHeld;
-    sqlText = 'DLCOBJ OBJ((MCPLIB/MCPCAT *FILE *EXCLRD))';
+    sqlText = 'DLCOBJ OBJ((MCPLIB/MCPSERVERS *FILE *EXCLRD))';
     exec sql call QSYS2.QCMDEXC(:sqlText);
     lockHeld = *off;
   endif;

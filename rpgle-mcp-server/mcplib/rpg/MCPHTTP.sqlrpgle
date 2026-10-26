@@ -4,7 +4,7 @@
 // This file handles HTTP and JSON-RPC, never a tool-specific SQL query.
 ctl-opt dftactgrp(*no) actgrp(*caller) option(*srcstmt:*nodebugio);
 
-// The CGI identity has read access to MCPCAT and per-server tool tables.
+// The CGI identity has read access to MCPSERVERS and per-server tool tables.
 exec sql set option commit = *none, naming = *sql;
 
 // IBM's RPG CGI example uses x'15' as the output line-feed character.
